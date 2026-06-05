@@ -1,4 +1,4 @@
-package com.example.atv4
+package com.calmcup.app
 
 import io.flutter.embedding.android.FlutterActivity
 
