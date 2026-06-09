@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import '../providers/copa_2026_provider.dart';
 import '../widgets/match_card.dart';
+import '../widgets/notification_toggle.dart';
 import 'copa_2026_screen.dart';
 import 'history_screen.dart';
 import 'stats_screen.dart';
@@ -118,6 +119,9 @@ class _DashboardTabState extends State<_DashboardTab> {
             floating: false,
             pinned: true,
             backgroundColor: const Color(0xFF0D1A0D),
+            actions: [
+              NotificationToggle(matches: provider.matches),
+            ],
             flexibleSpace: FlexibleSpaceBar(
               centerTitle: true,
               titlePadding: const EdgeInsets.only(bottom: 12),

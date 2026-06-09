@@ -5,10 +5,12 @@ import 'providers/copa_2026_provider.dart';
 import 'providers/history_provider.dart';
 import 'providers/simulator_provider.dart';
 import 'screens/home_screen.dart';
+import 'services/notification_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await initializeDateFormatting('pt_BR', null);
+  await NotificationService.instance.initialize();
   runApp(const CopaDoMundoApp());
 }
 

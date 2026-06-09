@@ -6,6 +6,7 @@ import '../models/group.dart';
 import '../models/local_result.dart';
 import '../services/world_cup_api_service.dart';
 import '../services/local_storage_service.dart';
+import '../services/notification_service.dart';
 
 class Copa2026Provider extends ChangeNotifier {
   final WorldCupApiService _api = WorldCupApiService();
@@ -70,6 +71,10 @@ class Copa2026Provider extends ChangeNotifier {
       _stadiums = results[2] as List<Stadium>;
       _localResults = results[3] as Map<String, LocalResult>;
       _groups = _api.extractGroupsFromMatches(_matches);
+
+      if (await NotificationService.instance.isEnabled) {
+        await NotificationService.instance.scheduleMatchNotifications(_matches);
+      }
     } catch (e) {
       _error = e.toString();
     }
