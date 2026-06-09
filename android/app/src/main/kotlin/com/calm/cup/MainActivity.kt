@@ -1,4 +1,4 @@
-package com.calmcup.app
+package com.calm.cup
 
 import io.flutter.embedding.android.FlutterActivity
 
