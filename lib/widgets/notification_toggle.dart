@@ -11,7 +11,7 @@ class NotificationToggle extends StatefulWidget {
 }
 
 class _NotificationToggleState extends State<NotificationToggle> {
-  bool _enabled = false;
+  bool _enabled = true;
   bool _loading = true;
 
   @override
@@ -36,10 +36,9 @@ class _NotificationToggleState extends State<NotificationToggle> {
       return;
     }
 
-    // Pede permissão antes de ativar
     final granted = await ns.requestPermission();
     if (!granted) {
-      _showSnack('Permissão de notificação negada');
+      _showSnack('Permissão de notificação negada nas configurações do sistema');
       return;
     }
 
@@ -69,10 +68,10 @@ class _NotificationToggleState extends State<NotificationToggle> {
   Widget build(BuildContext context) {
     if (_loading) return const SizedBox(width: 48);
     return IconButton(
-      tooltip: _enabled ? 'Desativar notificações' : 'Ativar notificações',
+      tooltip: _enabled ? 'Desativar notificações' : 'Reativar notificações',
       icon: Icon(
-        _enabled ? Icons.notifications_active : Icons.notifications_none,
-        color: _enabled ? const Color(0xFFFFD700) : Colors.white54,
+        _enabled ? Icons.notifications_active : Icons.notifications_off,
+        color: _enabled ? const Color(0xFFFFD700) : Colors.white38,
       ),
       onPressed: _toggle,
     );

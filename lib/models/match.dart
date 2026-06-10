@@ -55,7 +55,11 @@ class Match {
 
   bool get hasResult => score?.hasResult == true;
 
-  DateTime get dateTime => DateTime.parse(date);
+  DateTime get dateTime {
+    if (time.isEmpty) return DateTime.parse(date);
+    final t = time.length == 5 ? '$time:00' : time;
+    return DateTime.parse('${date}T$t');
+  }
 
   String get matchKey => '${date}_${team1}_$team2'.replaceAll(' ', '_');
 }

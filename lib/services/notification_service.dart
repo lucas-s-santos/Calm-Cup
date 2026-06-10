@@ -17,6 +17,9 @@ class NotificationService {
   static const _channelId = 'calmcup_matches';
   static const _channelName = 'Jogos da Copa';
 
+  // IDs reservados por partida: base*10+0 (15min antes), +1 (início), +2 (fim), +3 (ao vivo)
+  static const _liveIdOffset = 3;
+
   Future<void> initialize() async {
     tz_data.initializeTimeZones();
 
@@ -50,7 +53,7 @@ class NotificationService {
 
   Future<bool> get isEnabled async {
     final prefs = await SharedPreferences.getInstance();
-    return prefs.getBool(_enabledKey) ?? false;
+    return prefs.getBool(_enabledKey) ?? true;
   }
 
   Future<void> setEnabled(bool value) async {
@@ -86,19 +89,32 @@ class NotificationService {
       final match = matches[i];
       final kickoff = match.dateTime;
 
-      // Ignora jogos que já encerraram (mais de 105 min atrás)
-      if (kickoff.add(const Duration(minutes: 105)).isBefore(now)) continue;
+      // Fase mata-mata tem duração maior (tempo extra)
+      final isKnockout = match.group == null;
+      final matchDuration = Duration(minutes: isKnockout ? 120 : 105);
+
+      // Ignora jogos já encerrados
+      if (kickoff.add(matchDuration).isBefore(now)) continue;
 
       final flag1 = TeamFlags.get(match.team1);
       final flag2 = TeamFlags.get(match.team2);
       final teams = '$flag1 ${match.team1} x ${match.team2} $flag2';
-      final phase =
-          match.group != null ? 'Grupo ${match.group}' : match.round;
+      final phase = match.group != null ? 'Grupo ${match.group}' : match.round;
+
+      // Se o jogo está acontecendo agora, dispara notificação imediata
+      if (kickoff.isBefore(now) && kickoff.add(matchDuration).isAfter(now)) {
+        final elapsed = now.difference(kickoff).inMinutes;
+        await _show(
+          id: i * 10 + _liveIdOffset,
+          title: '🟢 Jogo ao vivo! $elapsedʼ',
+          body: '$teams — $phase',
+        );
+      }
 
       await _schedule(
         id: i * 10,
         title: '⚽ Jogo em 15 minutos!',
-        body: teams,
+        body: '$teams | $phase',
         when: kickoff.subtract(const Duration(minutes: 15)),
         now: now,
       );
@@ -115,10 +131,35 @@ class NotificationService {
         id: i * 10 + 2,
         title: '🏁 Fim de jogo!',
         body: teams,
-        when: kickoff.add(const Duration(minutes: 105)),
+        when: kickoff.add(matchDuration),
         now: now,
       );
     }
+  }
+
+  Future<void> _show({
+    required int id,
+    required String title,
+    required String body,
+  }) async {
+    await _plugin.show(
+      id,
+      title,
+      body,
+      NotificationDetails(
+        android: AndroidNotificationDetails(
+          _channelId,
+          _channelName,
+          importance: Importance.high,
+          priority: Priority.high,
+          icon: '@mipmap/ic_launcher',
+          largeIcon: const DrawableResourceAndroidBitmap('@mipmap/ic_launcher'),
+          styleInformation: BigTextStyleInformation(body),
+          color: const Color(0xFF1A472A),
+          autoCancel: true,
+        ),
+      ),
+    );
   }
 
   Future<void> _schedule({
@@ -130,7 +171,6 @@ class NotificationService {
   }) async {
     if (when.isBefore(now)) return;
 
-    // Usa millisecondsSinceEpoch para preservar o horário absoluto correto
     final tzWhen = tz.TZDateTime.fromMillisecondsSinceEpoch(
       tz.UTC,
       when.millisecondsSinceEpoch,

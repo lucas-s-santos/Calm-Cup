@@ -9,6 +9,7 @@ import '../utils/team_names_pt.dart';
 import '../widgets/match_card.dart';
 import 'match_detail_screen.dart';
 import 'simulator_screen.dart';
+import 'team_profile_screen.dart';
 
 class Copa2026Screen extends StatefulWidget {
   const Copa2026Screen({super.key});
@@ -24,7 +25,7 @@ class _Copa2026ScreenState extends State<Copa2026Screen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 5, vsync: this);
+    _tabController = TabController(length: 6, vsync: this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<Copa2026Provider>().load();
     });
@@ -81,10 +82,13 @@ class _Copa2026ScreenState extends State<Copa2026Screen>
           unselectedLabelColor: Colors.white38,
           labelStyle: const TextStyle(
               fontWeight: FontWeight.bold, fontSize: 12),
+          isScrollable: true,
+          tabAlignment: TabAlignment.start,
           tabs: const [
             Tab(text: 'Hoje'),
             Tab(text: 'Agenda'),
             Tab(text: 'Grupos'),
+            Tab(text: 'Artilheiros'),
             Tab(text: 'Seleções'),
             Tab(text: 'Estádios'),
           ],
@@ -133,6 +137,7 @@ class _Copa2026ScreenState extends State<Copa2026Screen>
               _TodayTab(provider: provider),
               _ScheduleTab(provider: provider),
               _GroupsTab(provider: provider),
+              _ScorersTab(provider: provider),
               _TeamsTab(provider: provider),
               _StadiumsTab(provider: provider),
             ],
@@ -457,6 +462,120 @@ class _GroupsTab extends StatelessWidget {
                   ),
                 );
               }),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+// ── Tab: Artilheiros ──────────────────────────────────────────────────────────
+
+class _ScorersTab extends StatelessWidget {
+  final Copa2026Provider provider;
+  const _ScorersTab({required this.provider});
+
+  @override
+  Widget build(BuildContext context) {
+    final scorers = provider.topScorers;
+
+    if (scorers.isEmpty) {
+      return const Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text('⚽', style: TextStyle(fontSize: 48)),
+            SizedBox(height: 12),
+            Text('Ainda sem gols registrados.',
+                style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold)),
+            SizedBox(height: 4),
+            Text('Os artilheiros aparecerão após os primeiros jogos.',
+                style: TextStyle(color: Colors.white54, fontSize: 13),
+                textAlign: TextAlign.center),
+          ],
+        ),
+      );
+    }
+
+    return ListView.builder(
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      itemCount: scorers.length,
+      itemBuilder: (ctx, i) {
+        final s = scorers[i];
+        final name = s['name'] as String;
+        final goals = s['goals'] as int;
+        final team = s['team'] as String;
+        final penalties = s['penalties'] as int;
+        final flag = TeamFlags.get(team);
+        final teamPt = TeamNamesPt.translate(team);
+
+        final medal = i == 0
+            ? '🥇'
+            : i == 1
+                ? '🥈'
+                : i == 2
+                    ? '🥉'
+                    : '${i + 1}º';
+
+        return Container(
+          margin: const EdgeInsets.fromLTRB(12, 0, 12, 6),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          decoration: BoxDecoration(
+            color: i < 3
+                ? const Color(0xFF1A472A).withValues(alpha: 0.3)
+                : const Color(0xFF131F13),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: i == 0
+                  ? const Color(0xFFFFD700).withValues(alpha: 0.4)
+                  : Colors.white12,
+            ),
+          ),
+          child: Row(
+            children: [
+              SizedBox(
+                width: 36,
+                child: Text(medal,
+                    style: const TextStyle(fontSize: 18),
+                    textAlign: TextAlign.center),
+              ),
+              const SizedBox(width: 8),
+              Text(flag.isNotEmpty ? flag : '🏳️',
+                  style: const TextStyle(fontSize: 22)),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(name,
+                        style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600)),
+                    Text(teamPt,
+                        style: const TextStyle(
+                            color: Colors.white54, fontSize: 11)),
+                  ],
+                ),
+              ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text('$goals ⚽',
+                      style: const TextStyle(
+                          color: Color(0xFFFFD700),
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold)),
+                  if (penalties > 0)
+                    Text('$penalties pen.',
+                        style: const TextStyle(
+                            color: Colors.white38, fontSize: 10)),
+                ],
+              ),
             ],
           ),
         );
@@ -817,6 +936,13 @@ class _TeamsTab extends StatelessWidget {
                     dense: true,
                     contentPadding: const EdgeInsets.symmetric(
                         horizontal: 12, vertical: 4),
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) =>
+                            TeamProfileScreen(teamName: rawName),
+                      ),
+                    ),
                   ),
                 );
               }),

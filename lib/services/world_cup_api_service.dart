@@ -15,18 +15,23 @@ class WorldCupApiService {
     2018, 2022,
   ];
 
-  Future<List<Match>> fetchMatches(int year) async {
+  Future<String> fetchMatchesRaw(int year) async {
     final url = Uri.parse('$_base/$year/worldcup.json');
-    final response = await http.get(url);
-    if (response.statusCode == 404) {
-      throw Exception('NOT_FOUND');  // sem dados na API para este ano
-    }
-    if (response.statusCode != 200) {
-      throw Exception('Erro ao carregar Copa $year');
-    }
-    final data = json.decode(response.body) as Map<String, dynamic>;
+    final response = await http.get(url).timeout(const Duration(seconds: 10));
+    if (response.statusCode == 404) throw Exception('NOT_FOUND');
+    if (response.statusCode != 200) throw Exception('Erro ao carregar Copa $year');
+    return response.body;
+  }
+
+  List<Match> parseMatchesFromRaw(String raw) {
+    final data = json.decode(raw) as Map<String, dynamic>;
     final matches = data['matches'] as List;
     return matches.map((m) => Match.fromJson(m as Map<String, dynamic>)).toList();
+  }
+
+  Future<List<Match>> fetchMatches(int year) async {
+    final raw = await fetchMatchesRaw(year);
+    return parseMatchesFromRaw(raw);
   }
 
   Future<List<Team>> fetchTeams2026() async {

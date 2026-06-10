@@ -232,31 +232,10 @@ class MatchDetailScreen extends StatelessWidget {
                 ),
               ),
 
-            // Gols
+            // Timeline de gols
             if (match.goals1.isNotEmpty || match.goals2.isNotEmpty) ...[
-              const _SectionDivider(title: 'Gols'),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    child: Column(
-                      children: match.goals1
-                          .map((g) => _GoalRow(
-                              goal: g, align: Alignment.centerRight))
-                          .toList(),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Column(
-                      children: match.goals2
-                          .map((g) =>
-                              _GoalRow(goal: g, align: Alignment.centerLeft))
-                          .toList(),
-                    ),
-                  ),
-                ],
-              ),
+              const _SectionDivider(title: 'Linha do Tempo'),
+              _GoalTimeline(match: match),
             ],
 
             const SizedBox(height: 32),
@@ -328,24 +307,151 @@ class _TeamColumn extends StatelessWidget {
   }
 }
 
-class _GoalRow extends StatelessWidget {
-  final dynamic goal;
-  final Alignment align;
-  const _GoalRow({required this.goal, required this.align});
+class _GoalTimeline extends StatelessWidget {
+  final Match match;
+  const _GoalTimeline({required this.match});
 
   @override
   Widget build(BuildContext context) {
+    // Junta todos os gols com o lado (1 = time da esquerda, 2 = direita)
+    final all = [
+      ...match.goals1.map((g) => (goal: g, side: 1)),
+      ...match.goals2.map((g) => (goal: g, side: 2)),
+    ]..sort((a, b) => a.goal.minute.compareTo(b.goal.minute));
+
+    final isKnockout = match.group == null;
+    final maxMin = isKnockout ? 120 : 90;
+    final flag1 = TeamFlags.get(match.team1);
+    final flag2 = TeamFlags.get(match.team2);
+
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 3),
-      child: Align(
-        alignment: align,
-        child: Text(
-          '${goal.icon} ${goal.name} ${goal.displayMinute}',
-          style: const TextStyle(color: Colors.white70, fontSize: 12),
-          textAlign: align == Alignment.centerRight
-              ? TextAlign.right
-              : TextAlign.left,
-        ),
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
+      child: Column(
+        children: [
+          // Barra visual da linha do tempo
+          LayoutBuilder(builder: (_, box) {
+            final w = box.maxWidth;
+            return SizedBox(
+              height: 36,
+              child: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  // Trilho de fundo
+                  Positioned(
+                    top: 16,
+                    left: 0,
+                    right: 0,
+                    child: Container(
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: Colors.white12,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
+                  // Divisor do intervalo (45')
+                  Positioned(
+                    top: 8,
+                    left: (45 / maxMin) * w - 1,
+                    child: Container(
+                        width: 2, height: 20, color: Colors.white24),
+                  ),
+                  // Marcadores de gol
+                  ...all.map((e) {
+                    final min =
+                        e.goal.minute + (e.goal.offset ?? 0) * 0.5;
+                    final x =
+                        ((min.clamp(0, maxMin.toDouble()) / maxMin) *
+                                w)
+                            .clamp(0.0, w - 16.0);
+                    final color = e.side == 1
+                        ? const Color(0xFFFFD700)
+                        : Colors.lightBlueAccent;
+                    return Positioned(
+                      left: x,
+                      top: 0,
+                      child: Column(
+                        children: [
+                          Icon(
+                            e.goal.ownGoal
+                                ? Icons.sports_soccer
+                                : Icons.sports_soccer,
+                            size: 18,
+                            color: e.goal.ownGoal
+                                ? Colors.red.shade400
+                                : color,
+                          ),
+                          Container(
+                              width: 2, height: 16, color: color),
+                        ],
+                      ),
+                    );
+                  }),
+                ],
+              ),
+            );
+          }),
+
+          // Legenda dos minutos
+          Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text("0'",
+                    style: const TextStyle(
+                        color: Colors.white38, fontSize: 10)),
+                Text("45'",
+                    style: const TextStyle(
+                        color: Colors.white38, fontSize: 10)),
+                Text("$maxMin'",
+                    style: const TextStyle(
+                        color: Colors.white38, fontSize: 10)),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 14),
+
+          // Lista cronológica dos gols
+          ...all.map((e) {
+            final g = e.goal;
+            final teamFlag =
+                e.side == 1 ? flag1 : flag2;
+            final color = e.side == 1
+                ? const Color(0xFFFFD700)
+                : Colors.lightBlueAccent;
+            return Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Row(
+                children: [
+                  SizedBox(
+                    width: 38,
+                    child: Text(
+                      g.displayMinute,
+                      style: TextStyle(
+                          color: color,
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                  Text(g.icon,
+                      style: const TextStyle(fontSize: 14)),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      g.name,
+                      style: const TextStyle(
+                          color: Colors.white, fontSize: 13),
+                    ),
+                  ),
+                  Text(teamFlag,
+                      style: const TextStyle(fontSize: 16)),
+                ],
+              ),
+            );
+          }),
+        ],
       ),
     );
   }

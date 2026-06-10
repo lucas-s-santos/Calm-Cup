@@ -8,6 +8,7 @@ import 'copa_2026_screen.dart';
 import 'history_screen.dart';
 import 'stats_screen.dart';
 import 'quiz_screen.dart';
+import 'bolao_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -22,6 +23,7 @@ class _HomeScreenState extends State<HomeScreen> {
   final List<Widget> _pages = const [
     _DashboardTab(),
     Copa2026Screen(),
+    BolaoScreen(),
     HistoryScreen(),
     StatsScreen(),
   ];
@@ -48,6 +50,11 @@ class _HomeScreenState extends State<HomeScreen> {
             label: 'Copa 2026',
           ),
           NavigationDestination(
+            icon: Icon(Icons.emoji_events_outlined),
+            selectedIcon: Icon(Icons.emoji_events),
+            label: 'Bolão',
+          ),
+          NavigationDestination(
             icon: Icon(Icons.history_outlined),
             selectedIcon: Icon(Icons.history),
             label: 'História',
@@ -70,21 +77,30 @@ class _DashboardTab extends StatefulWidget {
   State<_DashboardTab> createState() => _DashboardTabState();
 }
 
-class _DashboardTabState extends State<_DashboardTab> {
+class _DashboardTabState extends State<_DashboardTab>
+    with WidgetsBindingObserver {
   late ScrollController _scroll;
   bool _collapsed = false;
 
-  // A logo fica "colapsada" quando o scroll passa de ~80px
   static const _collapseThreshold = 80.0;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _scroll = ScrollController();
     _scroll.addListener(_onScroll);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<Copa2026Provider>().load();
     });
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && mounted) {
+      // Reagenda notificações sempre que o app volta ao primeiro plano
+      context.read<Copa2026Provider>().load();
+    }
   }
 
   void _onScroll() {
@@ -96,6 +112,7 @@ class _DashboardTabState extends State<_DashboardTab> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _scroll.removeListener(_onScroll);
     _scroll.dispose();
     super.dispose();
@@ -228,6 +245,17 @@ class _DashboardTabState extends State<_DashboardTab> {
                   onTap: () => _goToTab(context, 1),
                 ),
                 _NavCard(
+                  icon: Icons.emoji_events,
+                  title: 'Bolão',
+                  subtitle: 'Faça seus palpites',
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF5C3A1A), Color(0xFF2E1A0D)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  onTap: () => _goToTab(context, 2),
+                ),
+                _NavCard(
                   icon: Icons.history,
                   title: 'História',
                   subtitle: '1930 – 2022',
@@ -236,7 +264,7 @@ class _DashboardTabState extends State<_DashboardTab> {
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ),
-                  onTap: () => _goToTab(context, 2),
+                  onTap: () => _goToTab(context, 3),
                 ),
                 _NavCard(
                   icon: Icons.bar_chart,
@@ -247,7 +275,7 @@ class _DashboardTabState extends State<_DashboardTab> {
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ),
-                  onTap: () => _goToTab(context, 3),
+                  onTap: () => _goToTab(context, 4),
                 ),
                 _NavCard(
                   icon: Icons.quiz,

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import '../models/match.dart';
 import '../models/team.dart';
@@ -11,6 +12,7 @@ import '../services/notification_service.dart';
 class Copa2026Provider extends ChangeNotifier {
   final WorldCupApiService _api = WorldCupApiService();
   final LocalStorageService _local = LocalStorageService();
+  Timer? _liveTimer;
 
   List<Match> _matches = [];
   List<Team> _teams = [];
@@ -38,10 +40,7 @@ class Copa2026Provider extends ChangeNotifier {
 
   List<Match> get upcomingMatches {
     final now = DateTime.now();
-    return _matches
-        .where((m) => m.dateTime.isAfter(now))
-        .take(5)
-        .toList();
+    return _matches.where((m) => m.dateTime.isAfter(now)).take(5).toList();
   }
 
   List<Match> get nextDaysMatches {
@@ -52,29 +51,115 @@ class Copa2026Provider extends ChangeNotifier {
         .toList();
   }
 
-  Future<void> load() async {
-    if (_matches.isNotEmpty) return;
+  // Artilheiros agregados da Copa 2026
+  List<Map<String, dynamic>> get topScorers {
+    final Map<String, Map<String, dynamic>> map = {};
+    for (final m in _matches) {
+      for (final g in m.goals1) {
+        if (g.ownGoal) continue;
+        final e = map.putIfAbsent(
+            g.name, () => {'goals': 0, 'team': m.team1, 'penalties': 0});
+        e['goals'] = (e['goals'] as int) + 1;
+        if (g.penalty) e['penalties'] = (e['penalties'] as int) + 1;
+      }
+      for (final g in m.goals2) {
+        if (g.ownGoal) continue;
+        final e = map.putIfAbsent(
+            g.name, () => {'goals': 0, 'team': m.team2, 'penalties': 0});
+        e['goals'] = (e['goals'] as int) + 1;
+        if (g.penalty) e['penalties'] = (e['penalties'] as int) + 1;
+      }
+    }
+    return (map.entries.map((e) => {'name': e.key, ...e.value}).toList()
+      ..sort((a, b) {
+        final c = (b['goals'] as int).compareTo(a['goals'] as int);
+        return c != 0 ? c : (a['name'] as String).compareTo(b['name'] as String);
+      }));
+  }
+
+  List<Match> getTeamMatches(String team) =>
+      _matches.where((m) => m.team1 == team || m.team2 == team).toList();
+
+  bool get _hasLiveMatch {
+    final now = DateTime.now();
+    return _matches.any((m) {
+      final k = m.dateTime;
+      return k.isBefore(now) &&
+          k.add(const Duration(minutes: 120)).isAfter(now);
+    });
+  }
+
+  void _startLiveTimer() {
+    _liveTimer?.cancel();
+    if (!_hasLiveMatch) return;
+    _liveTimer =
+        Timer.periodic(const Duration(seconds: 60), (_) => _refreshLive());
+  }
+
+  Future<void> _refreshLive() async {
+    if (!_hasLiveMatch) {
+      _liveTimer?.cancel();
+      _liveTimer = null;
+      return;
+    }
+    try {
+      final raw = await _api.fetchMatchesRaw(2026);
+      await _local.saveMatchesCache(raw);
+      _matches = _api.parseMatchesFromRaw(raw);
+      notifyListeners();
+    } catch (_) {}
+  }
+
+  @override
+  void dispose() {
+    _liveTimer?.cancel();
+    super.dispose();
+  }
+
+  Future<void> load({bool forceReload = false}) async {
+    if (_matches.isNotEmpty && !forceReload) {
+      if (await NotificationService.instance.isEnabled) {
+        await NotificationService.instance.scheduleMatchNotifications(_matches);
+      }
+      _startLiveTimer();
+      return;
+    }
+
     _loading = true;
     _error = null;
     notifyListeners();
 
     try {
-      final results = await Future.wait([
-        _api.fetchMatches(2026),
+      List<Match> loadedMatches;
+      try {
+        final rawJson = await _api.fetchMatchesRaw(2026);
+        await _local.saveMatchesCache(rawJson);
+        loadedMatches = _api.parseMatchesFromRaw(rawJson);
+      } catch (_) {
+        final cached = await _local.loadMatchesCache();
+        if (cached != null) {
+          loadedMatches = _api.parseMatchesFromRaw(cached);
+        } else {
+          rethrow;
+        }
+      }
+
+      final others = await Future.wait([
         _api.fetchTeams2026(),
         _api.fetchStadiums2026(),
         _local.getAllResults(),
       ]);
 
-      _matches = results[0] as List<Match>;
-      _teams = results[1] as List<Team>;
-      _stadiums = results[2] as List<Stadium>;
-      _localResults = results[3] as Map<String, LocalResult>;
+      _matches = loadedMatches;
+      _teams = others[0] as List<Team>;
+      _stadiums = others[1] as List<Stadium>;
+      _localResults = others[2] as Map<String, LocalResult>;
       _groups = _api.extractGroupsFromMatches(_matches);
 
       if (await NotificationService.instance.isEnabled) {
         await NotificationService.instance.scheduleMatchNotifications(_matches);
       }
+      _startLiveTimer();
     } catch (e) {
       _error = e.toString();
     }
@@ -123,7 +208,8 @@ class Copa2026Provider extends ChangeNotifier {
     void addTeam(String team) {
       standings.putIfAbsent(
           team,
-          () => {'pts': 0, 'pj': 0, 'v': 0, 'e': 0, 'd': 0, 'gp': 0, 'gc': 0});
+          () =>
+              {'pts': 0, 'pj': 0, 'v': 0, 'e': 0, 'd': 0, 'gp': 0, 'gc': 0});
     }
 
     for (final match in groupMatches) {
@@ -144,30 +230,29 @@ class Copa2026Provider extends ChangeNotifier {
       addTeam(match.team1);
       addTeam(match.team2);
 
-      standings[match.team1]!['pj'] = (standings[match.team1]!['pj']! + 1);
-      standings[match.team2]!['pj'] = (standings[match.team2]!['pj']! + 1);
-      standings[match.team1]!['gp'] = (standings[match.team1]!['gp']! + g1);
-      standings[match.team1]!['gc'] = (standings[match.team1]!['gc']! + g2);
-      standings[match.team2]!['gp'] = (standings[match.team2]!['gp']! + g2);
-      standings[match.team2]!['gc'] = (standings[match.team2]!['gc']! + g1);
+      standings[match.team1]!['pj'] = standings[match.team1]!['pj']! + 1;
+      standings[match.team2]!['pj'] = standings[match.team2]!['pj']! + 1;
+      standings[match.team1]!['gp'] = standings[match.team1]!['gp']! + g1;
+      standings[match.team1]!['gc'] = standings[match.team1]!['gc']! + g2;
+      standings[match.team2]!['gp'] = standings[match.team2]!['gp']! + g2;
+      standings[match.team2]!['gc'] = standings[match.team2]!['gc']! + g1;
 
       if (g1 > g2) {
-        standings[match.team1]!['pts'] = (standings[match.team1]!['pts']! + 3);
-        standings[match.team1]!['v'] = (standings[match.team1]!['v']! + 1);
-        standings[match.team2]!['d'] = (standings[match.team2]!['d']! + 1);
+        standings[match.team1]!['pts'] = standings[match.team1]!['pts']! + 3;
+        standings[match.team1]!['v'] = standings[match.team1]!['v']! + 1;
+        standings[match.team2]!['d'] = standings[match.team2]!['d']! + 1;
       } else if (g1 == g2) {
-        standings[match.team1]!['pts'] = (standings[match.team1]!['pts']! + 1);
-        standings[match.team2]!['pts'] = (standings[match.team2]!['pts']! + 1);
-        standings[match.team1]!['e'] = (standings[match.team1]!['e']! + 1);
-        standings[match.team2]!['e'] = (standings[match.team2]!['e']! + 1);
+        standings[match.team1]!['pts'] = standings[match.team1]!['pts']! + 1;
+        standings[match.team2]!['pts'] = standings[match.team2]!['pts']! + 1;
+        standings[match.team1]!['e'] = standings[match.team1]!['e']! + 1;
+        standings[match.team2]!['e'] = standings[match.team2]!['e']! + 1;
       } else {
-        standings[match.team2]!['pts'] = (standings[match.team2]!['pts']! + 3);
-        standings[match.team2]!['v'] = (standings[match.team2]!['v']! + 1);
-        standings[match.team1]!['d'] = (standings[match.team1]!['d']! + 1);
+        standings[match.team2]!['pts'] = standings[match.team2]!['pts']! + 3;
+        standings[match.team2]!['v'] = standings[match.team2]!['v']! + 1;
+        standings[match.team1]!['d'] = standings[match.team1]!['d']! + 1;
       }
     }
 
-    // Adicionar times do grupo que ainda não jogaram
     final group = _groups.firstWhere(
       (g) => g.name == groupName,
       orElse: () => Group(name: groupName, teams: []),
