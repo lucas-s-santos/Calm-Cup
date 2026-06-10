@@ -60,9 +60,9 @@ void main() async {
     _bgTaskId,
     _bgTaskId,
     frequency: const Duration(hours: 12),
-    existingWorkPolicy: ExistingWorkPolicy.keep,
+    existingWorkPolicy: ExistingPeriodicWorkPolicy.keep,
     constraints: Constraints(
-      networkType: NetworkType.not_required,
+      networkType: NetworkType.notRequired,
     ),
   );
 
