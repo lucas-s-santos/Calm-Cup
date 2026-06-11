@@ -43,3 +43,16 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+/android/build/
+
+# Build outputs (App Bundles / APKs) — não versionar
+*.aab
+*.apk
+
+# Claude Code — configuração local de ferramentas
+.claude/
+
+# Segredos de assinatura — reforço (também em android/.gitignore). NUNCA versionar.
+key.properties
+*.jks
+*.keystore
