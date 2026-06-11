@@ -163,7 +163,7 @@ class MatchDetailScreen extends StatelessWidget {
                       const Icon(Icons.access_time,
                           color: Colors.white38, size: 14),
                       const SizedBox(width: 4),
-                      Text(match.time,
+                      Text(match.localTimeLabel,
                           style: const TextStyle(
                               color: Colors.white54, fontSize: 13)),
                     ],

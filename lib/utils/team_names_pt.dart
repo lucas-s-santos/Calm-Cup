@@ -205,7 +205,13 @@ class TeamNamesPt {
 
   static String translate(String name) => _names[name] ?? name;
 
-  static String round(String r) => _rounds[r] ?? r;
+  static String round(String r) {
+    final mapped = _rounds[r];
+    if (mapped != null) return mapped;
+    final md = RegExp(r'^Matchday (\d+)$').firstMatch(r);
+    if (md != null) return 'Rodada ${md.group(1)}';
+    return r;
+  }
 
   static String group(String g) =>
       g.startsWith('Group ') ? 'Grupo ${g.substring(6)}' : g;

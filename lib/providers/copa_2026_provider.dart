@@ -116,12 +116,20 @@ class Copa2026Provider extends ChangeNotifier {
     super.dispose();
   }
 
-  Future<void> load({bool forceReload = false}) async {
-    if (_matches.isNotEmpty && !forceReload) {
+  // Tarefas auxiliares (notificações e timer ao vivo) que não devem invalidar
+  // o carregamento caso falhem — os dados já estão disponíveis nesse ponto.
+  Future<void> _runSecondaryTasks() async {
+    try {
       if (await NotificationService.instance.isEnabled) {
         await NotificationService.instance.scheduleMatchNotifications(_matches);
       }
       _startLiveTimer();
+    } catch (_) {}
+  }
+
+  Future<void> load({bool forceReload = false}) async {
+    if (_matches.isNotEmpty && !forceReload) {
+      await _runSecondaryTasks();
       return;
     }
 
@@ -156,10 +164,7 @@ class Copa2026Provider extends ChangeNotifier {
       _localResults = others[2] as Map<String, LocalResult>;
       _groups = _api.extractGroupsFromMatches(_matches);
 
-      if (await NotificationService.instance.isEnabled) {
-        await NotificationService.instance.scheduleMatchNotifications(_matches);
-      }
-      _startLiveTimer();
+      await _runSecondaryTasks();
     } catch (e) {
       _error = e.toString();
     }

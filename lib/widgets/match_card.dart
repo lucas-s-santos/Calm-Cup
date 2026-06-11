@@ -91,8 +91,8 @@ class MatchCard extends StatelessWidget {
                         style: const TextStyle(
                             color: Colors.white38, fontSize: 11)),
                   const Spacer(),
-                  if (match.time.isNotEmpty)
-                    Text(match.time,
+                  if (match.localTimeLabel.isNotEmpty)
+                    Text(match.localTimeLabel,
                         style: const TextStyle(
                             color: Colors.white38, fontSize: 11)),
                   const SizedBox(width: 6),

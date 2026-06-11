@@ -290,7 +290,7 @@ class _MatchTile extends StatelessWidget {
               : const Color(0xFFFFD700);
     }
 
-    final dt = match.dateTime;
+    final dt = DateTime.tryParse(match.date) ?? match.dateTime;
     final dateLabel = DateFormat('dd/MM', 'pt_BR').format(dt);
 
     return ListTile(
