@@ -51,6 +51,22 @@ class Match {
     );
   }
 
+  /// Cópia da partida com um placar diferente (usado para sobrepor o placar
+  /// da fonte secundária mantendo todo o resto do openfootball).
+  Match copyWith({Score? score}) => Match(
+        round: round,
+        date: date,
+        time: time,
+        team1: team1,
+        team2: team2,
+        group: group,
+        ground: ground,
+        num: num,
+        score: score ?? this.score,
+        goals1: goals1,
+        goals2: goals2,
+      );
+
   bool get isGroupStage => group != null;
 
   bool get hasResult => score?.hasResult == true;

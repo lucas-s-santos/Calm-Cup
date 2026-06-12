@@ -5,6 +5,7 @@ import '../models/team.dart';
 import '../models/stadium.dart';
 import '../models/group.dart';
 import '../models/local_result.dart';
+import '../models/score.dart';
 import '../services/world_cup_api_service.dart';
 import '../services/local_storage_service.dart';
 import '../services/notification_service.dart';
@@ -19,6 +20,8 @@ class Copa2026Provider extends ChangeNotifier {
   List<Stadium> _stadiums = [];
   List<Group> _groups = [];
   Map<String, LocalResult> _localResults = {};
+  // Placares da fonte secundária (rezarahiminia), por matchKey.
+  Map<String, Score> _liveScores = {};
 
   bool _loading = false;
   String? _error;
@@ -105,7 +108,9 @@ class Copa2026Provider extends ChangeNotifier {
     try {
       final raw = await _api.fetchMatchesRaw(2026);
       await _local.saveMatchesCache(raw);
-      _matches = _api.parseMatchesFromRaw(raw);
+      final of = _api.parseMatchesFromRaw(raw);
+      _liveScores = await _fetchLiveScoresSafe();
+      _matches = _withLiveScores(of);
       notifyListeners();
     } catch (_) {}
   }
@@ -114,6 +119,28 @@ class Copa2026Provider extends ChangeNotifier {
   void dispose() {
     _liveTimer?.cancel();
     super.dispose();
+  }
+
+  // Busca os placares da fonte secundária sem nunca lançar (camada opcional).
+  Future<Map<String, Score>> _fetchLiveScoresSafe() async {
+    try {
+      return await _api.fetchLiveScores2026();
+    } catch (_) {
+      return {};
+    }
+  }
+
+  // Usa o placar que aparecer primeiro: o openfootball tem precedência quando
+  // já publicou o resultado (mais confiável/correto); o rezarahiminia preenche
+  // quando o openfootball ainda não tem — trazendo placar (inclusive ao vivo)
+  // o quanto antes.
+  List<Match> _withLiveScores(List<Match> matches) {
+    if (_liveScores.isEmpty) return matches;
+    return matches.map((m) {
+      if (m.hasResult) return m; // openfootball já tem o placar -> mantém
+      final live = _liveScores[m.matchKey];
+      return live != null ? m.copyWith(score: live) : m;
+    }).toList();
   }
 
   // Tarefas auxiliares (notificações e timer ao vivo) que não devem invalidar
@@ -152,16 +179,20 @@ class Copa2026Provider extends ChangeNotifier {
         }
       }
 
+      // Placares da fonte secundária em paralelo; nunca derruba o load.
+      final liveFuture = _fetchLiveScoresSafe();
+
       final others = await Future.wait([
         _api.fetchTeams2026(),
         _api.fetchStadiums2026(),
         _local.getAllResults(),
       ]);
 
-      _matches = loadedMatches;
       _teams = others[0] as List<Team>;
       _stadiums = others[1] as List<Stadium>;
       _localResults = others[2] as Map<String, LocalResult>;
+      _liveScores = await liveFuture;
+      _matches = _withLiveScores(loadedMatches);
       _groups = _api.extractGroupsFromMatches(_matches);
 
       await _runSecondaryTasks();
@@ -221,13 +252,15 @@ class Copa2026Provider extends ChangeNotifier {
       final localResult = _localResults[match.matchKey];
       final apiScore = match.score;
 
+      // Prioridade igual à dos cards: placar automático (rezarahiminia ->
+      // openfootball) tem precedência; o manual preenche quando não há oficial.
       int? g1, g2;
-      if (localResult != null) {
-        g1 = localResult.score1;
-        g2 = localResult.score2;
-      } else if (apiScore?.hasResult == true) {
+      if (apiScore?.hasResult == true) {
         g1 = apiScore!.ft[0];
         g2 = apiScore.ft[1];
+      } else if (localResult != null) {
+        g1 = localResult.score1;
+        g2 = localResult.score2;
       }
 
       if (g1 == null || g2 == null) continue;
