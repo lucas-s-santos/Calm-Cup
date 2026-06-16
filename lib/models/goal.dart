@@ -1,3 +1,5 @@
+import '../utils/json_parse.dart';
+
 class Goal {
   final String name;
   final int minute;
@@ -16,8 +18,8 @@ class Goal {
   factory Goal.fromJson(Map<String, dynamic> json) {
     return Goal(
       name: json['name'] as String,
-      minute: json['minute'] as int,
-      offset: json['offset'] as int?,
+      minute: asIntOr(json['minute'], 0),
+      offset: asIntOrNull(json['offset']),
       penalty: json['penalty'] == true,
       ownGoal: json['owngoal'] == true,
     );

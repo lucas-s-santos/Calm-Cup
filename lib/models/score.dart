@@ -1,3 +1,5 @@
+import '../utils/json_parse.dart';
+
 class Score {
   final List<int> ft;
   final List<int>? ht;
@@ -9,7 +11,10 @@ class Score {
   factory Score.fromJson(Map<String, dynamic> json) {
     List<int> parseList(dynamic val) {
       if (val == null) return [];
-      return (val as List).map((e) => e as int).toList();
+      return (val as List)
+          .map(asIntOrNull)
+          .whereType<int>()
+          .toList();
     }
 
     return Score(

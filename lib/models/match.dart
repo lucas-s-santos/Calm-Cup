@@ -1,5 +1,6 @@
 import 'score.dart';
 import 'goal.dart';
+import '../utils/json_parse.dart';
 
 class Match {
   final String round;
@@ -42,7 +43,7 @@ class Match {
       team2: json['team2'] as String,
       group: json['group'] as String?,
       ground: json['ground'] as String,
-      num: json['num'] as int?,
+      num: asIntOrNull(json['num']),
       score: json['score'] != null
           ? Score.fromJson(json['score'] as Map<String, dynamic>)
           : null,
