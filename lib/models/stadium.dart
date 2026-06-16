@@ -1,3 +1,5 @@
+import '../utils/json_parse.dart';
+
 class Stadium {
   final String city;
   final String timezone;
@@ -20,7 +22,7 @@ class Stadium {
       city: json['city'] as String,
       timezone: json['timezone'] as String,
       name: json['name'] as String,
-      capacity: json['capacity'] as int,
+      capacity: asIntOr(json['capacity'], 0),
       coords: json['coords'] as String,
       cc: json['cc'] as String?,
     );
