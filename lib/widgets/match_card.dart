@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../models/match.dart';
 import '../models/local_result.dart';
 import '../providers/copa_2026_provider.dart';
+import '../theme/app_colors.dart';
 import '../utils/team_flags.dart';
 import '../utils/team_names_pt.dart';
 import 'score_entry_dialog.dart';
@@ -33,6 +34,7 @@ class MatchCard extends StatelessWidget {
     final score = match.score;
     final hasApiResult = score?.hasResult == true;
     final hasLocalResult = localResult != null;
+    final isLive = match.isLive;
 
     String scoreText = 'x';
     bool isLocal = false;
@@ -91,11 +93,15 @@ class MatchCard extends StatelessWidget {
                         style: const TextStyle(
                             color: Colors.white38, fontSize: 11)),
                   const Spacer(),
-                  if (match.localTimeLabel.isNotEmpty)
+                  if (isLive) ...[
+                    const _LiveBadge(),
+                    const SizedBox(width: 6),
+                  ] else if (match.localTimeLabel.isNotEmpty) ...[
                     Text(match.localTimeLabel,
                         style: const TextStyle(
                             color: Colors.white38, fontSize: 11)),
-                  const SizedBox(width: 6),
+                    const SizedBox(width: 6),
+                  ],
                   Text(dateFormatted,
                       style: const TextStyle(
                           color: Colors.white54, fontSize: 11)),
@@ -113,33 +119,37 @@ class MatchCard extends StatelessWidget {
                           _isWinner(match, localResult, true),
                     ),
                   ),
-                  Container(
-                    margin: const EdgeInsets.symmetric(horizontal: 12),
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 14, vertical: 7),
-                    decoration: BoxDecoration(
-                      color: hasResult
-                          ? const Color(0xFFFFD700).withValues(alpha: 0.12)
-                          : const Color(0xFF243024),
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(
+                  Builder(builder: (_) {
+                    // Acento vermelho quando ao vivo, dourado quando há
+                    // resultado final/manual, neutro quando ainda não começou.
+                    final accent =
+                        isLive ? AppColors.live : AppColors.gold;
+                    return Container(
+                      margin: const EdgeInsets.symmetric(horizontal: 12),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 7),
+                      decoration: BoxDecoration(
                         color: hasResult
-                            ? const Color(0xFFFFD700).withValues(alpha: 0.3)
-                            : Colors.white12,
+                            ? accent.withValues(alpha: 0.12)
+                            : AppColors.cardBorder,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: hasResult
+                              ? accent.withValues(alpha: 0.3)
+                              : Colors.white12,
+                        ),
                       ),
-                    ),
-                    child: Text(
-                      scoreText,
-                      style: TextStyle(
-                        color: hasResult
-                            ? const Color(0xFFFFD700)
-                            : Colors.white24,
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 1,
+                      child: Text(
+                        scoreText,
+                        style: TextStyle(
+                          color: hasResult ? accent : Colors.white24,
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 1,
+                        ),
                       ),
-                    ),
-                  ),
+                    );
+                  }),
                   Expanded(
                     child: _TeamSide(
                       name: name2,
@@ -292,6 +302,72 @@ class _TeamSide extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.start,
             children: children,
           );
+  }
+}
+
+// Selo "AO VIVO" com pontinho que pulsa suavemente.
+class _LiveBadge extends StatefulWidget {
+  const _LiveBadge();
+
+  @override
+  State<_LiveBadge> createState() => _LiveBadgeState();
+}
+
+class _LiveBadgeState extends State<_LiveBadge>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 900),
+    )..repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+      decoration: BoxDecoration(
+        color: AppColors.live.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(5),
+        border: Border.all(color: AppColors.live.withValues(alpha: 0.5)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          FadeTransition(
+            opacity: Tween(begin: 1.0, end: 0.25).animate(_controller),
+            child: Container(
+              width: 6,
+              height: 6,
+              decoration: const BoxDecoration(
+                color: AppColors.live,
+                shape: BoxShape.circle,
+              ),
+            ),
+          ),
+          const SizedBox(width: 5),
+          const Text(
+            'AO VIVO',
+            style: TextStyle(
+              color: AppColors.live,
+              fontSize: 10,
+              fontWeight: FontWeight.bold,
+              letterSpacing: 0.5,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 

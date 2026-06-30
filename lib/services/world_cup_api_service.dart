@@ -46,26 +46,40 @@ class WorldCupApiService {
     return parseMatchesFromRaw(raw);
   }
 
-  Future<List<Team>> fetchTeams2026() async {
+  Future<String> fetchTeams2026Raw() async {
     final url = Uri.parse('$_base/2026/worldcup.teams.json');
-    final response = await http.get(url);
+    final response = await http.get(url).timeout(const Duration(seconds: 10));
     if (response.statusCode != 200) throw Exception('Erro ao carregar seleções');
-    final data = json.decode(response.body) as List;
+    return response.body;
+  }
+
+  List<Team> parseTeams(String raw) {
+    final data = json.decode(raw) as List;
     return data.map((t) => Team.fromJson(t as Map<String, dynamic>)).toList();
   }
 
-  Future<List<Stadium>> fetchStadiums2026() async {
+  Future<List<Team>> fetchTeams2026() async =>
+      parseTeams(await fetchTeams2026Raw());
+
+  Future<String> fetchStadiums2026Raw() async {
     final url = Uri.parse('$_base/2026/worldcup.stadiums.json');
-    final response = await http.get(url);
+    final response = await http.get(url).timeout(const Duration(seconds: 10));
     if (response.statusCode != 200) throw Exception('Erro ao carregar estádios');
-    final data = json.decode(response.body) as Map<String, dynamic>;
+    return response.body;
+  }
+
+  List<Stadium> parseStadiums(String raw) {
+    final data = json.decode(raw) as Map<String, dynamic>;
     final stadiums = data['stadiums'] as List;
     return stadiums.map((s) => Stadium.fromJson(s as Map<String, dynamic>)).toList();
   }
 
+  Future<List<Stadium>> fetchStadiums2026() async =>
+      parseStadiums(await fetchStadiums2026Raw());
+
   Future<List<Group>> fetchGroups(int year) async {
     final url = Uri.parse('$_base/$year/worldcup.groups.json');
-    final response = await http.get(url);
+    final response = await http.get(url).timeout(const Duration(seconds: 10));
     if (response.statusCode != 200) return [];
     final data = json.decode(response.body) as Map<String, dynamic>;
     final groups = data['groups'] as List?;

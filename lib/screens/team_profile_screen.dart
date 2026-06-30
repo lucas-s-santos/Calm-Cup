@@ -281,7 +281,7 @@ class _MatchTile extends StatelessWidget {
     Color scoreColor = Colors.white38;
     if (hasResult) {
       final s1 = isHome ? score!.ft[0] : score!.ft[1];
-      final s2 = isHome ? score!.ft[1] : score!.ft[0];
+      final s2 = isHome ? score.ft[1] : score.ft[0];
       scoreStr = '$s1 × $s2';
       scoreColor = s1 > s2
           ? const Color(0xFF4CAF50)

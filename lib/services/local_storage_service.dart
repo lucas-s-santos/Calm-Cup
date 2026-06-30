@@ -4,6 +4,8 @@ import '../models/local_result.dart';
 class LocalStorageService {
   static const _prefix = 'result_';
   static const _matchesCacheKey = 'matches_2026_json';
+  static const _teamsCacheKey = 'teams_2026_json';
+  static const _stadiumsCacheKey = 'stadiums_2026_json';
 
   Future<void> saveMatchesCache(String rawJson) async {
     final prefs = await SharedPreferences.getInstance();
@@ -13,6 +15,26 @@ class LocalStorageService {
   Future<String?> loadMatchesCache() async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getString(_matchesCacheKey);
+  }
+
+  Future<void> saveTeamsCache(String rawJson) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_teamsCacheKey, rawJson);
+  }
+
+  Future<String?> loadTeamsCache() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(_teamsCacheKey);
+  }
+
+  Future<void> saveStadiumsCache(String rawJson) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_stadiumsCacheKey, rawJson);
+  }
+
+  Future<String?> loadStadiumsCache() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(_stadiumsCacheKey);
   }
 
   Future<void> saveResult(String matchKey, int score1, int score2) async {

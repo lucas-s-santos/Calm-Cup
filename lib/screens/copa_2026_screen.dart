@@ -4,9 +4,12 @@ import 'package:intl/intl.dart';
 import '../providers/copa_2026_provider.dart';
 import '../models/match.dart';
 import '../models/stadium.dart';
+import '../theme/app_colors.dart';
+import '../utils/constants.dart';
 import '../utils/team_flags.dart';
 import '../utils/team_names_pt.dart';
 import '../widgets/match_card.dart';
+import '../widgets/copa_bracket_view.dart';
 import 'match_detail_screen.dart';
 import 'simulator_screen.dart';
 import 'team_profile_screen.dart';
@@ -25,7 +28,7 @@ class _Copa2026ScreenState extends State<Copa2026Screen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 6, vsync: this);
+    _tabController = TabController(length: 7, vsync: this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<Copa2026Provider>().load();
     });
@@ -88,6 +91,7 @@ class _Copa2026ScreenState extends State<Copa2026Screen>
             Tab(text: 'Hoje'),
             Tab(text: 'Agenda'),
             Tab(text: 'Grupos'),
+            Tab(text: 'Mata-mata'),
             Tab(text: 'Artilheiros'),
             Tab(text: 'Seleções'),
             Tab(text: 'Estádios'),
@@ -134,16 +138,33 @@ class _Copa2026ScreenState extends State<Copa2026Screen>
           return TabBarView(
             controller: _tabController,
             children: [
-              _TodayTab(provider: provider),
-              _ScheduleTab(provider: provider),
-              _GroupsTab(provider: provider),
-              _ScorersTab(provider: provider),
-              _TeamsTab(provider: provider),
-              _StadiumsTab(provider: provider),
+              _RefreshWrap(child: _TodayTab(provider: provider)),
+              _RefreshWrap(child: _ScheduleTab(provider: provider)),
+              _RefreshWrap(child: _GroupsTab(provider: provider)),
+              _RefreshWrap(child: CopaBracketView(provider: provider)),
+              _RefreshWrap(child: _ScorersTab(provider: provider)),
+              _RefreshWrap(child: _TeamsTab(provider: provider)),
+              _RefreshWrap(child: _StadiumsTab(provider: provider)),
             ],
           );
         },
       ),
+    );
+  }
+}
+
+// Envolve uma aba com pull-to-refresh (arrastar pra baixo recarrega tudo).
+class _RefreshWrap extends StatelessWidget {
+  final Widget child;
+  const _RefreshWrap({required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return RefreshIndicator(
+      onRefresh: () => context.read<Copa2026Provider>().refresh(),
+      color: AppColors.gold,
+      backgroundColor: AppColors.green,
+      child: child,
     );
   }
 }
@@ -162,6 +183,7 @@ class _TodayTab extends StatelessWidget {
     final todayMatches = provider.todayMatches;
 
     return ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.symmetric(vertical: 12),
       children: [
         Padding(
@@ -195,7 +217,7 @@ class _TodayTab extends StatelessWidget {
                         fontSize: 17,
                         fontWeight: FontWeight.bold)),
                 const SizedBox(height: 4),
-                const Text('A Copa começa em 11/06/2026',
+                const Text('A Copa começa em $kWorldCupStartLabel',
                     style: TextStyle(color: Colors.white54, fontSize: 13)),
               ],
             ),
@@ -247,6 +269,7 @@ class _ScheduleTab extends StatelessWidget {
     final dates = grouped.keys.toList()..sort();
 
     return ListView.builder(
+      physics: const AlwaysScrollableScrollPhysics(),
       itemCount: dates.length,
       itemBuilder: (ctx, i) {
         final date = dates[i];
@@ -313,11 +336,11 @@ class _GroupsTab extends StatelessWidget {
     final groups = provider.groups;
     if (groups.isEmpty) {
       return const Center(
-          child: Text('Carregando grupos...',
-              style: TextStyle(color: Colors.white54)));
+          child: CircularProgressIndicator(color: AppColors.gold));
     }
 
     return ListView.builder(
+      physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.symmetric(vertical: 10),
       itemCount: groups.length,
       itemBuilder: (ctx, i) {
@@ -502,6 +525,7 @@ class _ScorersTab extends StatelessWidget {
     }
 
     return ListView.builder(
+      physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.symmetric(vertical: 12),
       itemCount: scorers.length,
       itemBuilder: (ctx, i) {
@@ -606,12 +630,12 @@ class _StadiumsTab extends StatelessWidget {
 
     if (byCountry.isEmpty) {
       return const Center(
-        child: Text('Carregando estádios...',
-            style: TextStyle(color: Colors.white54)),
+        child: CircularProgressIndicator(color: AppColors.gold),
       );
     }
 
     return ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.symmetric(vertical: 10),
       children: _countryOrder
           .where((cc) => byCountry.containsKey(cc))
@@ -839,6 +863,7 @@ class _TeamsTab extends StatelessWidget {
     final confeds = byConfed.keys.toList()..sort();
 
     return ListView.builder(
+      physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.symmetric(vertical: 10),
       itemCount: confeds.length,
       itemBuilder: (ctx, i) {

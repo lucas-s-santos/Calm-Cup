@@ -1,5 +1,6 @@
 import 'score.dart';
 import 'goal.dart';
+import '../utils/json_parse.dart';
 
 class Match {
   final String round;
@@ -42,7 +43,7 @@ class Match {
       team2: json['team2'] as String,
       group: json['group'] as String?,
       ground: json['ground'] as String,
-      num: json['num'] as int?,
+      num: asIntOrNull(json['num']),
       score: json['score'] != null
           ? Score.fromJson(json['score'] as Map<String, dynamic>)
           : null,
@@ -70,6 +71,16 @@ class Match {
   bool get isGroupStage => group != null;
 
   bool get hasResult => score?.hasResult == true;
+
+  /// `true` enquanto o jogo está (provavelmente) em andamento: entre o apito
+  /// inicial e a duração estimada (105' grupos, 120' mata-mata, cobrindo
+  /// acréscimos/prorrogação). Usado para o selo "AO VIVO".
+  bool get isLive {
+    final now = DateTime.now();
+    final start = dateTime;
+    final duration = Duration(minutes: group == null ? 120 : 105);
+    return !now.isBefore(start) && now.isBefore(start.add(duration));
+  }
 
   /// Instante absoluto do início do jogo.
   ///

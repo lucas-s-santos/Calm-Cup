@@ -16,12 +16,21 @@ class Copa2026Provider extends ChangeNotifier {
   Timer? _liveTimer;
 
   List<Match> _matches = [];
+  // Base "pura" do openfootball (sem placar ao vivo sobreposto). É a partir
+  // dela que `_matches` é recalculado a cada refresh — evita que um placar ao
+  // vivo "grude" e nunca mais atualize.
+  List<Match> _ofMatches = [];
   List<Team> _teams = [];
   List<Stadium> _stadiums = [];
   List<Group> _groups = [];
   Map<String, LocalResult> _localResults = {};
   // Placares da fonte secundária (rezarahiminia), por matchKey.
   Map<String, Score> _liveScores = {};
+  // Contador de ticks do refresh ao vivo (para espaçar o refetch do openfootball).
+  int _liveTick = 0;
+  // Assinatura do último agendamento de notificações — evita reagendar ~300
+  // alarmes a cada resume quando os horários dos jogos não mudaram.
+  String? _lastScheduledSig;
 
   bool _loading = false;
   String? _error;
@@ -106,11 +115,21 @@ class Copa2026Provider extends ChangeNotifier {
       return;
     }
     try {
-      final raw = await _api.fetchMatchesRaw(2026);
-      await _local.saveMatchesCache(raw);
-      final of = _api.parseMatchesFromRaw(raw);
+      // A cada tick (60s) busca só os placares ao vivo — leve.
       _liveScores = await _fetchLiveScoresSafe();
-      _matches = _withLiveScores(of);
+
+      // A base do openfootball (placares oficiais) muda devagar; rebusca só a
+      // cada ~5 min em vez de a cada 60s, economizando dados/bateria.
+      if (_liveTick % 5 == 0) {
+        try {
+          final raw = await _api.fetchMatchesRaw(2026);
+          await _local.saveMatchesCache(raw);
+          _ofMatches = _api.parseMatchesFromRaw(raw);
+        } catch (_) {}
+      }
+      _liveTick++;
+
+      _matches = _withLiveScores(_ofMatches);
       notifyListeners();
     } catch (_) {}
   }
@@ -130,6 +149,37 @@ class Copa2026Provider extends ChangeNotifier {
     }
   }
 
+  // Seleções: tenta a rede (salvando no cache) e cai para o cache offline em
+  // caso de falha. Nunca lança — uma seleção ausente não derruba o load.
+  Future<List<Team>> _loadTeams() async {
+    try {
+      final raw = await _api.fetchTeams2026Raw();
+      await _local.saveTeamsCache(raw);
+      return _api.parseTeams(raw);
+    } catch (_) {
+      final cached = await _local.loadTeamsCache();
+      return cached != null ? _api.parseTeams(cached) : <Team>[];
+    }
+  }
+
+  // Estádios: mesma estratégia rede → cache offline, sem lançar.
+  Future<List<Stadium>> _loadStadiums() async {
+    try {
+      final raw = await _api.fetchStadiums2026Raw();
+      await _local.saveStadiumsCache(raw);
+      return _api.parseStadiums(raw);
+    } catch (_) {
+      final cached = await _local.loadStadiumsCache();
+      return cached != null ? _api.parseStadiums(cached) : <Stadium>[];
+    }
+  }
+
+  // Assinatura dos jogos que importam para o agendamento (chave + horário de
+  // início). Independe de placar — atualizar placar ao vivo não reagenda nada.
+  String _scheduleSignature(List<Match> matches) => matches
+      .map((m) => '${m.matchKey}@${m.dateTime.millisecondsSinceEpoch}')
+      .join('|');
+
   // Usa o placar que aparecer primeiro: o openfootball tem precedência quando
   // já publicou o resultado (mais confiável/correto); o rezarahiminia preenche
   // quando o openfootball ainda não tem — trazendo placar (inclusive ao vivo)
@@ -148,19 +198,29 @@ class Copa2026Provider extends ChangeNotifier {
   Future<void> _runSecondaryTasks() async {
     try {
       if (await NotificationService.instance.isEnabled) {
-        await NotificationService.instance.scheduleMatchNotifications(_matches);
+        // Só reagenda se os horários dos jogos realmente mudaram — evita
+        // recriar ~300 alarmes a cada vez que o app volta ao primeiro plano.
+        final sig = _scheduleSignature(_matches);
+        if (sig != _lastScheduledSig) {
+          await NotificationService.instance.scheduleMatchNotifications(_matches);
+          _lastScheduledSig = sig;
+        }
       }
       _startLiveTimer();
     } catch (_) {}
   }
 
-  Future<void> load({bool forceReload = false}) async {
+  /// Recarrega tudo sem mostrar o spinner de tela cheia (usado pelo
+  /// pull-to-refresh — o próprio RefreshIndicator já indica o progresso).
+  Future<void> refresh() => load(forceReload: true, silent: true);
+
+  Future<void> load({bool forceReload = false, bool silent = false}) async {
     if (_matches.isNotEmpty && !forceReload) {
       await _runSecondaryTasks();
       return;
     }
 
-    _loading = true;
+    if (!silent) _loading = true;
     _error = null;
     notifyListeners();
 
@@ -182,9 +242,11 @@ class Copa2026Provider extends ChangeNotifier {
       // Placares da fonte secundária em paralelo; nunca derruba o load.
       final liveFuture = _fetchLiveScoresSafe();
 
+      // Seleções/estádios agora têm timeout + cache offline próprios e não
+      // lançam — uma delas falhar não impede os jogos de aparecerem.
       final others = await Future.wait([
-        _api.fetchTeams2026(),
-        _api.fetchStadiums2026(),
+        _loadTeams(),
+        _loadStadiums(),
         _local.getAllResults(),
       ]);
 
@@ -192,7 +254,8 @@ class Copa2026Provider extends ChangeNotifier {
       _stadiums = others[1] as List<Stadium>;
       _localResults = others[2] as Map<String, LocalResult>;
       _liveScores = await liveFuture;
-      _matches = _withLiveScores(loadedMatches);
+      _ofMatches = loadedMatches;
+      _matches = _withLiveScores(_ofMatches);
       _groups = _api.extractGroupsFromMatches(_matches);
 
       await _runSecondaryTasks();
@@ -232,6 +295,156 @@ class Copa2026Provider extends ChangeNotifier {
     } catch (_) {
       return null;
     }
+  }
+
+  // ── Mata-mata / Chaveamento (dados reais) ───────────────────────────────────
+  //
+  // Os jogos eliminatórios chegam do openfootball com os "times" preenchidos
+  // por códigos (ex.: "1A" = 1º do Grupo A, "W73" = vencedor do jogo 73,
+  // "3A/B/C/D" = melhor 3º entre esses grupos). Aqui resolvemos esses códigos
+  // contra a classificação e os placares REAIS (oficiais/ao vivo ou manuais),
+  // sem simulação — só leitura. O que ainda não dá pra determinar fica como o
+  // próprio código (a UI mostra "A definir").
+
+  bool get hasKnockoutData => _matches.any((m) => m.group == null);
+
+  List<Match> _roundSorted(String round) =>
+      _matches.where((m) => m.round == round).toList()
+        ..sort((a, b) => (a.num ?? 0).compareTo(b.num ?? 0));
+
+  List<Match> get roundOf32 => _roundSorted('Round of 32');
+  List<Match> get roundOf16 => _roundSorted('Round of 16');
+  List<Match> get quarterFinals => _roundSorted('Quarter-final');
+  List<Match> get semiFinals => _roundSorted('Semi-final');
+  List<Match> get thirdPlace => _roundSorted('Match for third place');
+  List<Match> get finalMatch => _roundSorted('Final');
+
+  // Classificação em cache + 3ºs já atribuídos: preenchidos por prepareBracket(),
+  // chamado uma vez antes de montar o chaveamento na UI.
+  final Set<String> _assigned3rd = {};
+  Map<String, List<Map<String, dynamic>>> _standingsCache = {};
+
+  void prepareBracket() {
+    _assigned3rd.clear();
+    _standingsCache = {
+      for (final g in _groups) g.name: getGroupStandings(g.name),
+    };
+  }
+
+  /// Placar real do jogo (oficial/ao vivo tem precedência; manual completa).
+  List<int>? bracketResult(Match m) {
+    final apiScore = m.score;
+    if (apiScore?.hasResult == true) return [apiScore!.ft[0], apiScore.ft[1]];
+    final local = _localResults[m.matchKey];
+    if (local != null) return [local.score1, local.score2];
+    return null;
+  }
+
+  /// Resolve um código de chaveamento para o nome real da seleção, ou retorna
+  /// o próprio código quando ainda indefinido.
+  String resolveBracketCode(String code) {
+    final w = RegExp(r'^W(\d+)$').firstMatch(code);
+    if (w != null) return _matchWinner(int.parse(w.group(1)!)) ?? code;
+
+    final l = RegExp(r'^L(\d+)$').firstMatch(code);
+    if (l != null) return _matchLoser(int.parse(l.group(1)!)) ?? code;
+
+    final pos = RegExp(r'^([12])([A-L])$').firstMatch(code);
+    if (pos != null) {
+      final idx = int.parse(pos.group(1)!) - 1;
+      final standings = _standingsCache['Group ${pos.group(2)}'];
+      if (standings != null && idx < standings.length) {
+        return standings[idx]['team'] as String;
+      }
+      return code;
+    }
+
+    if (code.startsWith('3')) return _resolveBest3rd(code) ?? code;
+
+    return code;
+  }
+
+  // Detecta os placeholders do chaveamento: "1A"/"2B" (posição no grupo),
+  // "W73"/"L101" (vencedor/perdedor de jogo) e "3A/B/C/D" (melhor 3º). Tudo
+  // que NÃO casa com esses padrões é nome real de seleção.
+  static final RegExp _codeRe =
+      RegExp(r'^([12][A-L]|[WL]\d+|3[A-L](/[A-L])*)$');
+
+  /// `true` quando o valor ainda é um código não resolvido (mostrar "A definir").
+  bool isCode(String value) => _codeRe.hasMatch(value);
+
+  Match? _matchByNum(int num) {
+    try {
+      return _matches.firstWhere((m) => m.num == num);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  // Índice do vencedor (0/1) considerando pênaltis no empate; null se não dá
+  // pra determinar (sem placar, ou empate sem disputa de pênaltis registrada).
+  int? _winnerIndex(Match m, List<int> r) {
+    if (r[0] != r[1]) return r[0] > r[1] ? 0 : 1;
+    final p = m.score?.p;
+    if (p != null && p.length == 2 && p[0] != p[1]) return p[0] > p[1] ? 0 : 1;
+    return null;
+  }
+
+  String? _matchWinner(int num) {
+    final m = _matchByNum(num);
+    if (m == null) return null;
+    final r = bracketResult(m);
+    if (r == null) return null;
+    final w = _winnerIndex(m, r);
+    if (w == null) return null;
+    return resolveBracketCode(w == 0 ? m.team1 : m.team2);
+  }
+
+  String? _matchLoser(int num) {
+    final m = _matchByNum(num);
+    if (m == null) return null;
+    final r = bracketResult(m);
+    if (r == null) return null;
+    final w = _winnerIndex(m, r);
+    if (w == null) return null;
+    return resolveBracketCode(w == 0 ? m.team2 : m.team1);
+  }
+
+  // Melhor 3º colocado entre os grupos do código "3A/B/C/...", evitando repetir
+  // um time já atribuído a outra vaga (mesma heurística do simulador).
+  String? _resolveBest3rd(String code) {
+    final allowed = code.substring(1).split('/').map((l) => 'Group $l').toSet();
+    final candidates = <Map<String, dynamic>>[];
+    for (final entry in _standingsCache.entries) {
+      if (!allowed.contains(entry.key)) continue;
+      if (entry.value.length >= 3) candidates.add(entry.value[2]);
+    }
+    candidates.sort((a, b) {
+      int c = (b['pts'] as int).compareTo(a['pts'] as int);
+      if (c != 0) return c;
+      c = (b['sg'] as int).compareTo(a['sg'] as int);
+      if (c != 0) return c;
+      return (b['gp'] as int).compareTo(a['gp'] as int);
+    });
+    for (final c in candidates) {
+      final team = c['team'] as String;
+      if (!_assigned3rd.contains(team)) {
+        _assigned3rd.add(team);
+        return team;
+      }
+    }
+    return null;
+  }
+
+  /// Campeão real, quando a final já tem vencedor definido.
+  String? get realChampion {
+    if (finalMatch.isEmpty) return null;
+    final f = finalMatch.first;
+    final r = bracketResult(f);
+    if (r == null) return null;
+    final w = _winnerIndex(f, r);
+    if (w == null) return null;
+    return resolveBracketCode(w == 0 ? f.team1 : f.team2);
   }
 
   List<Map<String, dynamic>> getGroupStandings(String groupName) {

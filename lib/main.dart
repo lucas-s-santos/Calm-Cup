@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart'
+    show kIsWeb, defaultTargetPlatform, TargetPlatform;
 import 'package:flutter/material.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:provider/provider.dart';
@@ -6,6 +8,7 @@ import 'providers/copa_2026_provider.dart';
 import 'providers/history_provider.dart';
 import 'providers/simulator_provider.dart';
 import 'providers/bolao_provider.dart';
+import 'theme/app_colors.dart';
 import 'screens/home_screen.dart';
 import 'services/notification_service.dart';
 import 'services/local_storage_service.dart';
@@ -52,19 +55,26 @@ void main() async {
   // Em lançamentos subsequentes retorna imediatamente se já concedida.
   await NotificationService.instance.requestPermission();
 
-  await Workmanager().initialize(_bgCallback, isInDebugMode: false);
+  // WorkManager só tem implementação em Android/iOS — em desktop/web pular
+  // evita o crash de inicialização (não afeta o app publicado na Play Store).
+  final isMobile = !kIsWeb &&
+      (defaultTargetPlatform == TargetPlatform.android ||
+          defaultTargetPlatform == TargetPlatform.iOS);
+  if (isMobile) {
+    await Workmanager().initialize(_bgCallback);
 
-  // Tarefa periódica a cada 12h: mantém notificações agendadas mesmo
-  // com o app fechado, reinicializado ou com alarmes limpos pelo sistema.
-  await Workmanager().registerPeriodicTask(
-    _bgTaskId,
-    _bgTaskId,
-    frequency: const Duration(hours: 12),
-    existingWorkPolicy: ExistingPeriodicWorkPolicy.keep,
-    constraints: Constraints(
-      networkType: NetworkType.notRequired,
-    ),
-  );
+    // Tarefa periódica a cada 12h: mantém notificações agendadas mesmo
+    // com o app fechado, reinicializado ou com alarmes limpos pelo sistema.
+    await Workmanager().registerPeriodicTask(
+      _bgTaskId,
+      _bgTaskId,
+      frequency: const Duration(hours: 12),
+      existingWorkPolicy: ExistingPeriodicWorkPolicy.keep,
+      constraints: Constraints(
+        networkType: NetworkType.notRequired,
+      ),
+    );
+  }
 
   runApp(const CopaDoMundoApp());
 }
@@ -95,37 +105,37 @@ class CopaDoMundoApp extends StatelessWidget {
       useMaterial3: true,
       brightness: Brightness.dark,
       colorScheme: ColorScheme.fromSeed(
-        seedColor: const Color(0xFF1A472A),
+        seedColor: AppColors.green,
         brightness: Brightness.dark,
-        primary: const Color(0xFFFFD700),
-        secondary: const Color(0xFF1A472A),
-        surface: const Color(0xFF0D1A0D),
+        primary: AppColors.gold,
+        secondary: AppColors.green,
+        surface: AppColors.bg,
       ),
-      scaffoldBackgroundColor: const Color(0xFF0D1A0D),
+      scaffoldBackgroundColor: AppColors.bg,
       appBarTheme: const AppBarTheme(
-        backgroundColor: Color(0xFF1A472A),
+        backgroundColor: AppColors.green,
         foregroundColor: Colors.white,
         elevation: 0,
       ),
       navigationBarTheme: NavigationBarThemeData(
-        backgroundColor: const Color(0xFF0D1A0D),
+        backgroundColor: AppColors.bg,
         labelTextStyle: WidgetStateProperty.resolveWith((states) {
           if (states.contains(WidgetState.selected)) {
-            return const TextStyle(color: Color(0xFFFFD700), fontSize: 12);
+            return const TextStyle(color: AppColors.gold, fontSize: 12);
           }
           return const TextStyle(color: Colors.white54, fontSize: 12);
         }),
         iconTheme: WidgetStateProperty.resolveWith((states) {
           if (states.contains(WidgetState.selected)) {
-            return const IconThemeData(color: Color(0xFFFFD700));
+            return const IconThemeData(color: AppColors.gold);
           }
           return const IconThemeData(color: Colors.white54);
         }),
       ),
       tabBarTheme: const TabBarThemeData(
-        labelColor: Color(0xFFFFD700),
+        labelColor: AppColors.gold,
         unselectedLabelColor: Colors.white54,
-        indicatorColor: Color(0xFFFFD700),
+        indicatorColor: AppColors.gold,
       ),
       textTheme: const TextTheme(
         bodyMedium: TextStyle(color: Colors.white),

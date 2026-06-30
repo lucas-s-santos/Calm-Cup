@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import '../providers/copa_2026_provider.dart';
+import '../theme/app_colors.dart';
+import '../utils/constants.dart';
 import '../widgets/match_card.dart';
 import '../widgets/notification_toggle.dart';
 import 'copa_2026_screen.dart';
@@ -128,7 +130,11 @@ class _DashboardTabState extends State<_DashboardTab>
 
     return Scaffold(
       backgroundColor: const Color(0xFF0D1A0D),
-      body: CustomScrollView(
+      body: RefreshIndicator(
+        onRefresh: () => context.read<Copa2026Provider>().refresh(),
+        color: AppColors.gold,
+        backgroundColor: AppColors.green,
+        child: CustomScrollView(
         controller: _scroll,
         slivers: [
           SliverAppBar(
@@ -296,6 +302,7 @@ class _DashboardTabState extends State<_DashboardTab>
             ),
           ),
         ],
+        ),
       ),
     );
   }
@@ -496,7 +503,7 @@ class _EmptyMatchesCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final nextDate = upcomingMatches.isNotEmpty
         ? upcomingMatches.first.date
-        : '11/06/2026';
+        : kWorldCupStartLabel;
     return Container(
       margin: const EdgeInsets.all(16),
       padding: const EdgeInsets.all(20),
