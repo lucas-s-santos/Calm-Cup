@@ -5,18 +5,26 @@ import '../models/match.dart';
 import '../models/local_result.dart';
 import '../models/stadium.dart';
 import '../providers/copa_2026_provider.dart';
-import '../utils/team_flags.dart';
 import '../utils/team_names_pt.dart';
 import '../widgets/score_entry_dialog.dart';
+import '../widgets/team_badge.dart';
 
 class MatchDetailScreen extends StatelessWidget {
   final Match match;
   final bool show2026Actions;
+  final String? competitionId;
+
+  /// Mesma tag passada pro `MatchCard` de origem — precisa ser exatamente
+  /// igual pra transição Hero funcionar. `null` (padrão) não anima nada,
+  /// corte de tela normal — usado por toda navegação que não seja a home.
+  final String? heroTag;
 
   const MatchDetailScreen({
     super.key,
     required this.match,
     this.show2026Actions = false,
+    this.competitionId,
+    this.heroTag,
   });
 
   @override
@@ -48,9 +56,9 @@ class MatchDetailScreen extends StatelessWidget {
         : TeamNamesPt.round(match.round);
 
     return Scaffold(
-      backgroundColor: const Color(0xFF0D1A0D),
+      backgroundColor: const Color(0xFF121212),
       appBar: AppBar(
-        backgroundColor: const Color(0xFF1A472A),
+        backgroundColor: const Color(0xFF1E1E1E),
         title: Text(roundLabel,
             style: const TextStyle(color: Colors.white, fontSize: 16)),
         iconTheme: const IconThemeData(color: Colors.white),
@@ -65,7 +73,7 @@ class MatchDetailScreen extends StatelessWidget {
                 gradient: LinearGradient(
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
-                  colors: [Color(0xFF1A472A), Color(0xFF0D1A0D)],
+                  colors: [Color(0xFF1E1E1E), Color(0xFF121212)],
                 ),
               ),
               padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 24),
@@ -87,35 +95,40 @@ class MatchDetailScreen extends StatelessWidget {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                     children: [
-                      _TeamColumn(name: match.team1),
+                      _TeamColumn(name: match.team1, competitionId: competitionId),
                       Column(
                         children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 20, vertical: 10),
-                            decoration: BoxDecoration(
-                              color: (hasApiResult || hasLocalResult)
-                                  ? const Color(0xFFFFD700)
-                                      .withValues(alpha: 0.15)
-                                  : const Color(0xFF1E2D1E),
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(
-                                color: isLocal
-                                    ? const Color(0xFFFFD700)
-                                    : Colors.white24,
-                              ),
-                            ),
-                            child: Text(
-                              scoreText,
-                              style: TextStyle(
+                          Builder(builder: (_) {
+                            final box = Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 20, vertical: 10),
+                              decoration: BoxDecoration(
                                 color: (hasApiResult || hasLocalResult)
                                     ? const Color(0xFFFFD700)
-                                    : Colors.white38,
-                                fontSize: 32,
-                                fontWeight: FontWeight.bold,
+                                        .withValues(alpha: 0.15)
+                                    : const Color(0xFF202020),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: isLocal
+                                      ? const Color(0xFFFFD700)
+                                      : Colors.white24,
+                                ),
                               ),
-                            ),
-                          ),
+                              child: Text(
+                                scoreText,
+                                style: TextStyle(
+                                  color: (hasApiResult || hasLocalResult)
+                                      ? const Color(0xFFFFD700)
+                                      : Colors.white38,
+                                  fontSize: 32,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            );
+                            return heroTag == null
+                                ? box
+                                : Hero(tag: heroTag!, child: box);
+                          }),
                           if (isLocal) ...[
                             const SizedBox(height: 6),
                             const Text('📝 Resultado local',
@@ -146,7 +159,7 @@ class MatchDetailScreen extends StatelessWidget {
                           ],
                         ],
                       ),
-                      _TeamColumn(name: match.team2),
+                      _TeamColumn(name: match.team2, competitionId: competitionId),
                     ],
                   ),
                   const SizedBox(height: 16),
@@ -235,7 +248,7 @@ class MatchDetailScreen extends StatelessWidget {
             // Timeline de gols
             if (match.goals1.isNotEmpty || match.goals2.isNotEmpty) ...[
               const _SectionDivider(title: 'Linha do Tempo'),
-              _GoalTimeline(match: match),
+              _GoalTimeline(match: match, competitionId: competitionId),
             ],
 
             const SizedBox(height: 32),
@@ -276,21 +289,19 @@ class MatchDetailScreen extends StatelessWidget {
 
 class _TeamColumn extends StatelessWidget {
   final String name;
-  const _TeamColumn({required this.name});
+  final String? competitionId;
+  const _TeamColumn({required this.name, this.competitionId});
 
   @override
   Widget build(BuildContext context) {
-    final flag = TeamFlags.get(name);
     final namePt = TeamNamesPt.translate(name);
 
     return SizedBox(
       width: 90,
       child: Column(
         children: [
-          if (flag.isNotEmpty) ...[
-            Text(flag, style: const TextStyle(fontSize: 36)),
-            const SizedBox(height: 6),
-          ],
+          TeamBadge(teamName: name, competitionId: competitionId, size: 36),
+          const SizedBox(height: 6),
           Text(
             namePt,
             textAlign: TextAlign.center,
@@ -309,7 +320,8 @@ class _TeamColumn extends StatelessWidget {
 
 class _GoalTimeline extends StatelessWidget {
   final Match match;
-  const _GoalTimeline({required this.match});
+  final String? competitionId;
+  const _GoalTimeline({required this.match, this.competitionId});
 
   @override
   Widget build(BuildContext context) {
@@ -319,10 +331,7 @@ class _GoalTimeline extends StatelessWidget {
       ...match.goals2.map((g) => (goal: g, side: 2)),
     ]..sort((a, b) => a.goal.minute.compareTo(b.goal.minute));
 
-    final isKnockout = match.group == null;
-    final maxMin = isKnockout ? 120 : 90;
-    final flag1 = TeamFlags.get(match.team1);
-    final flag2 = TeamFlags.get(match.team2);
+    final maxMin = match.isKnockoutStage ? 120 : 90;
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
@@ -416,8 +425,7 @@ class _GoalTimeline extends StatelessWidget {
           // Lista cronológica dos gols
           ...all.map((e) {
             final g = e.goal;
-            final teamFlag =
-                e.side == 1 ? flag1 : flag2;
+            final teamName = e.side == 1 ? match.team1 : match.team2;
             final color = e.side == 1
                 ? const Color(0xFFFFD700)
                 : Colors.lightBlueAccent;
@@ -445,8 +453,10 @@ class _GoalTimeline extends StatelessWidget {
                           color: Colors.white, fontSize: 13),
                     ),
                   ),
-                  Text(teamFlag,
-                      style: const TextStyle(fontSize: 16)),
+                  TeamBadge(
+                      teamName: teamName,
+                      competitionId: competitionId,
+                      size: 16),
                 ],
               ),
             );

@@ -208,7 +208,9 @@ class TeamNamesPt {
   static String round(String r) {
     final mapped = _rounds[r];
     if (mapped != null) return mapped;
-    final md = RegExp(r'^Matchday (\d+)$').firstMatch(r);
+    // Aceita o prefixo "League, " da fase de liga da Champions League além
+    // do "Matchday N" simples das ligas domésticas.
+    final md = RegExp(r'^(?:League, )?Matchday (\d+)$').firstMatch(r);
     if (md != null) return 'Rodada ${md.group(1)}';
     return r;
   }

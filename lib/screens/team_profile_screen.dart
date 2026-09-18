@@ -6,7 +6,7 @@ import '../providers/history_provider.dart';
 import '../models/match.dart';
 import '../utils/team_flags.dart';
 import '../utils/team_names_pt.dart';
-import '../services/world_cup_api_service.dart';
+import '../services/openfootball_json_service.dart';
 import 'match_detail_screen.dart';
 import 'head_to_head_screen.dart';
 
@@ -56,9 +56,9 @@ class _TeamProfileScreenState extends State<TeamProfileScreen> {
     final group = teamInfo.isNotEmpty ? teamInfo.first.group : '';
 
     return Scaffold(
-      backgroundColor: const Color(0xFF0D1A0D),
+      backgroundColor: const Color(0xFF121212),
       appBar: AppBar(
-        backgroundColor: const Color(0xFF1A472A),
+        backgroundColor: const Color(0xFF1E1E1E),
         iconTheme: const IconThemeData(color: Colors.white),
         title: Text(namePt,
             style: const TextStyle(
@@ -90,7 +90,7 @@ class _TeamProfileScreenState extends State<TeamProfileScreen> {
               gradient: LinearGradient(
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
-                colors: [Color(0xFF1A472A), Color(0xFF0D1A0D)],
+                colors: [Color(0xFF1E1E1E), Color(0xFF121212)],
               ),
             ),
             child: Column(
@@ -184,7 +184,7 @@ class _TeamProfileScreenState extends State<TeamProfileScreen> {
     int copas = 0, wins = 0, draws = 0, losses = 0, gf = 0, ga = 0;
     final yearsPlayed = <int>{};
 
-    for (final year in WorldCupApiService.historicalYears) {
+    for (final year in OpenFootballJsonService.historicalYears) {
       for (final m in h.getMatches(year)) {
         if (m.team1 != team && m.team2 != team) continue;
         if (m.score?.hasResult != true) continue;
@@ -284,7 +284,7 @@ class _MatchTile extends StatelessWidget {
       final s2 = isHome ? score.ft[1] : score.ft[0];
       scoreStr = '$s1 × $s2';
       scoreColor = s1 > s2
-          ? const Color(0xFF4CAF50)
+          ? const Color(0xFF22C55E)
           : s1 < s2
               ? Colors.red.shade400
               : const Color(0xFFFFD700);
@@ -330,7 +330,7 @@ class _HistoryStats extends StatelessWidget {
       margin: const EdgeInsets.fromLTRB(16, 0, 16, 8),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFF131F13),
+        color: const Color(0xFF181818),
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: Colors.white12),
       ),
@@ -351,7 +351,7 @@ class _HistoryStats extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
               _StatItem('${stats['gf']}', 'Gols pró',
-                  color: const Color(0xFF4CAF50)),
+                  color: const Color(0xFF22C55E)),
               _StatItem('${stats['ga']}', 'Gols contra',
                   color: Colors.red.shade400),
               _StatItem(

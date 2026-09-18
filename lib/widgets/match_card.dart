@@ -5,9 +5,9 @@ import '../models/match.dart';
 import '../models/local_result.dart';
 import '../providers/copa_2026_provider.dart';
 import '../theme/app_colors.dart';
-import '../utils/team_flags.dart';
 import '../utils/team_names_pt.dart';
 import 'score_entry_dialog.dart';
+import 'team_badge.dart';
 
 class MatchCard extends StatelessWidget {
   final Match match;
@@ -15,11 +15,31 @@ class MatchCard extends StatelessWidget {
   final bool showGroup;
   final VoidCallback? onTap;
 
+  /// Rótulo do campeonato (ex.: "🏆 Copa do Mundo 2026"), exibido junto do
+  /// grupo/rodada. Usado só quando o card aparece numa lista que mistura
+  /// partidas de várias competições (ex.: "Jogos de Hoje" da home) — quando
+  /// null, o card se comporta exatamente como antes.
+  final String? competitionLabel;
+
+  /// Id da competição (`Competition.id`, ex. "premier-league") — usado só
+  /// pra resolver escudo real de clube via `TeamBadge`/`ClubCrests`; seleções
+  /// nacionais (Copa do Mundo/Euro) não precisam disso, já caem na bandeira.
+  final String? competitionId;
+
+  /// Tag pra transição Hero do placar até `MatchDetailScreen`. `null`
+  /// (padrão, todo o resto do app) não usa Hero nenhum — só quem passa uma
+  /// tag explícita (hoje só a home) ganha a animação, evitando colidir com
+  /// outro `MatchCard` do mesmo jogo montado em outra aba do `IndexedStack`.
+  final String? heroTag;
+
   const MatchCard({
     super.key,
     required this.match,
     this.show2026Actions = false,
     this.showGroup = true,
+    this.competitionLabel,
+    this.competitionId,
+    this.heroTag,
     this.onTap,
   });
 
@@ -48,24 +68,29 @@ class MatchCard extends StatelessWidget {
 
     final name1 = TeamNamesPt.translate(match.team1);
     final name2 = TeamNamesPt.translate(match.team2);
-    final flag1 = TeamFlags.get(match.team1);
-    final flag2 = TeamFlags.get(match.team2);
     final dateFormatted = _formatDate(match.date);
     final hasResult = hasApiResult || hasLocalResult;
+
+    final groupLabel =
+        showGroup && match.group != null ? TeamNamesPt.group(match.group!) : null;
+    final roundLabel = TeamNamesPt.round(match.round);
+    final leftLabel = competitionLabel == null
+        ? (groupLabel ?? roundLabel)
+        : '$competitionLabel · ${groupLabel ?? roundLabel}';
 
     return GestureDetector(
       onTap: onTap,
       child: Container(
         margin: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
         decoration: BoxDecoration(
-          color: const Color(0xFF1A2A1A),
+          color: const Color(0xFF1A1A1A),
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
             color: isLocal
                 ? const Color(0xFFFFD700).withValues(alpha: 0.5)
                 : hasResult
-                    ? const Color(0xFF2A4A2A)
-                    : const Color(0xFF243024),
+                    ? const Color(0xFF2E2E2E)
+                    : const Color(0xFF2E2E2E),
             width: isLocal ? 1.5 : 1,
           ),
           boxShadow: [
@@ -82,16 +107,19 @@ class MatchCard extends StatelessWidget {
             children: [
               Row(
                 children: [
-                  if (showGroup && match.group != null)
+                  if (groupLabel != null)
                     _Badge(
-                      label: TeamNamesPt.group(match.group!),
+                      label: leftLabel,
                       color: const Color(0xFFFFD700).withValues(alpha: 0.15),
                       textColor: const Color(0xFFFFD700),
                     )
                   else
-                    Text(TeamNamesPt.round(match.round),
-                        style: const TextStyle(
-                            color: Colors.white38, fontSize: 11)),
+                    Flexible(
+                      child: Text(leftLabel,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                              color: Colors.white38, fontSize: 11)),
+                    ),
                   const Spacer(),
                   if (isLive) ...[
                     const _LiveBadge(),
@@ -113,7 +141,8 @@ class MatchCard extends StatelessWidget {
                   Expanded(
                     child: _TeamSide(
                       name: name1,
-                      flag: flag1,
+                      teamName: match.team1,
+                      competitionId: competitionId,
                       align: TextAlign.right,
                       isWinner: hasResult &&
                           _isWinner(match, localResult, true),
@@ -124,7 +153,7 @@ class MatchCard extends StatelessWidget {
                     // resultado final/manual, neutro quando ainda não começou.
                     final accent =
                         isLive ? AppColors.live : AppColors.gold;
-                    return Container(
+                    final box = Container(
                       margin: const EdgeInsets.symmetric(horizontal: 12),
                       padding: const EdgeInsets.symmetric(
                           horizontal: 14, vertical: 7),
@@ -149,11 +178,15 @@ class MatchCard extends StatelessWidget {
                         ),
                       ),
                     );
+                    return heroTag == null
+                        ? box
+                        : Hero(tag: heroTag!, child: box);
                   }),
                   Expanded(
                     child: _TeamSide(
                       name: name2,
-                      flag: flag2,
+                      teamName: match.team2,
+                      competitionId: competitionId,
                       align: TextAlign.left,
                       isWinner: hasResult &&
                           _isWinner(match, localResult, false),
@@ -259,13 +292,15 @@ class MatchCard extends StatelessWidget {
 
 class _TeamSide extends StatelessWidget {
   final String name;
-  final String flag;
+  final String teamName;
+  final String? competitionId;
   final TextAlign align;
   final bool isWinner;
 
   const _TeamSide({
     required this.name,
-    required this.flag,
+    required this.teamName,
+    this.competitionId,
     required this.align,
     required this.isWinner,
   });
@@ -273,10 +308,8 @@ class _TeamSide extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final children = [
-      if (flag.isNotEmpty) ...[
-        Text(flag, style: const TextStyle(fontSize: 20)),
-        const SizedBox(width: 6),
-      ],
+      TeamBadge(teamName: teamName, competitionId: competitionId, size: 20),
+      const SizedBox(width: 6),
       Flexible(
         child: Text(
           name,

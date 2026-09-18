@@ -1,7 +1,9 @@
 import 'dart:math';
 import 'package:flutter/foundation.dart';
 import '../models/match.dart';
-import '../services/world_cup_api_service.dart';
+import '../services/openfootball_json_service.dart';
+import '../utils/bracket_code_resolver.dart';
+import '../utils/standings_calculator.dart';
 
 const _weightedScores = [
   [1, 0], [0, 1], [2, 1], [1, 2], [2, 0], [0, 2], [1, 1],
@@ -12,7 +14,7 @@ const _weights = [12, 12, 9, 9, 8, 8, 7, 5, 5, 4, 4, 3, 2, 2, 1, 1, 1, 1];
 const _weightsNoTie = [13, 13, 10, 10, 9, 9, 6, 6, 5, 5, 3, 3, 1, 1, 1, 1];
 
 class SimulatorProvider extends ChangeNotifier {
-  final WorldCupApiService _api = WorldCupApiService();
+  final OpenFootballJsonService _api = OpenFootballJsonService();
 
   List<Match> _matches = [];
   final Map<String, List<int>> _results = {}; // matchKey -> [s1, s2]
@@ -138,73 +140,35 @@ class SimulatorProvider extends ChangeNotifier {
 
   /// Returns group standings: groupName -> sorted list of team stats
   Map<String, List<Map<String, dynamic>>> computeAllStandings() {
-    final Map<String, Map<String, Map<String, int>>> raw = {};
-
+    final Map<String, List<Match>> byGroup = {};
     for (final m in groupMatches) {
-      final g = m.group!;
-      raw.putIfAbsent(g, () => {});
-      raw[g]!.putIfAbsent(m.team1, () => _emptyStats());
-      raw[g]!.putIfAbsent(m.team2, () => _emptyStats());
-
-      final result = _results[m.matchKey];
-      if (result == null) continue;
-
-      final s1 = result[0], s2 = result[1];
-      _applyResult(raw[g]!, m.team1, m.team2, s1, s2);
+      byGroup.putIfAbsent(m.group!, () => []).add(m);
     }
 
-    final standings = <String, List<Map<String, dynamic>>>{};
-    for (final entry in raw.entries) {
-      standings[entry.key] = _sortGroup(entry.value);
-    }
-    return standings;
-  }
-
-  Map<String, int> _emptyStats() =>
-      {'pts': 0, 'pj': 0, 'v': 0, 'e': 0, 'd': 0, 'gp': 0, 'gc': 0};
-
-  void _applyResult(Map<String, Map<String, int>> g, String t1, String t2,
-      int s1, int s2) {
-    g[t1]!['pj'] = g[t1]!['pj']! + 1;
-    g[t2]!['pj'] = g[t2]!['pj']! + 1;
-    g[t1]!['gp'] = g[t1]!['gp']! + s1;
-    g[t1]!['gc'] = g[t1]!['gc']! + s2;
-    g[t2]!['gp'] = g[t2]!['gp']! + s2;
-    g[t2]!['gc'] = g[t2]!['gc']! + s1;
-
-    if (s1 > s2) {
-      g[t1]!['pts'] = g[t1]!['pts']! + 3;
-      g[t1]!['v'] = g[t1]!['v']! + 1;
-      g[t2]!['d'] = g[t2]!['d']! + 1;
-    } else if (s1 == s2) {
-      g[t1]!['pts'] = g[t1]!['pts']! + 1;
-      g[t2]!['pts'] = g[t2]!['pts']! + 1;
-      g[t1]!['e'] = g[t1]!['e']! + 1;
-      g[t2]!['e'] = g[t2]!['e']! + 1;
-    } else {
-      g[t2]!['pts'] = g[t2]!['pts']! + 3;
-      g[t2]!['v'] = g[t2]!['v']! + 1;
-      g[t1]!['d'] = g[t1]!['d']! + 1;
-    }
-  }
-
-  List<Map<String, dynamic>> _sortGroup(
-      Map<String, Map<String, int>> group) {
-    final list = group.entries.map((e) {
-      final sg = e.value['gp']! - e.value['gc']!;
-      return {'team': e.key, ...e.value, 'sg': sg};
-    }).toList();
-    list.sort((a, b) {
-      int c = (b['pts'] as int).compareTo(a['pts'] as int);
-      if (c != 0) return c;
-      c = (b['sg'] as int).compareTo(a['sg'] as int);
-      if (c != 0) return c;
-      return (b['gp'] as int).compareTo(a['gp'] as int);
-    });
-    return list;
+    return {
+      for (final entry in byGroup.entries)
+        entry.key: computeStandings(
+          entry.value,
+          scoreOf: (m) => _results[m.matchKey],
+          // Times aparecem na tabela com 0 mesmo antes de jogar.
+          knownTeams: {
+            for (final m in entry.value) ...[m.team1, m.team2],
+          },
+        ),
+    };
   }
 
   // ── Team Code Resolution ──────────────────────────────────────────────────
+
+  /// Empate no chaveamento simulado (sem pênaltis modelados) sempre favorece
+  /// o time 1 — mesmo critério do código original.
+  late final BracketCodeResolver _resolver = BracketCodeResolver(
+    matchByNum: _matchByNum,
+    resultOf: (m) => _results[m.matchKey],
+    standingsByGroup: computeAllStandings,
+    winnerIndex: (m, r) => r[0] >= r[1] ? 0 : 1,
+    fallbackToTopWhenExhausted: true,
+  );
 
   /// Resolves a bracket team code to an actual team name.
   /// - "1A" → 1st place Group A
@@ -212,62 +176,7 @@ class SimulatorProvider extends ChangeNotifier {
   /// - "3A/B/C/D/F" → best 3rd-place from those groups
   /// - "W73" → winner of match 73
   /// - "L101" → loser of match 101
-  String resolveCode(String code) {
-    // Winner of a match
-    final wMatch = RegExp(r'^W(\d+)$').firstMatch(code);
-    if (wMatch != null) {
-      final num = int.parse(wMatch.group(1)!);
-      return _matchWinner(num) ?? 'W$num';
-    }
-
-    // Loser of a match
-    final lMatch = RegExp(r'^L(\d+)$').firstMatch(code);
-    if (lMatch != null) {
-      final num = int.parse(lMatch.group(1)!);
-      return _matchLoser(num) ?? 'L$num';
-    }
-
-    // Position + group: "1A", "2B", etc.
-    final posGroup = RegExp(r'^([12])([A-L])$').firstMatch(code);
-    if (posGroup != null) {
-      final pos = int.parse(posGroup.group(1)!) - 1;
-      final groupLetter = posGroup.group(2)!;
-      final standings = computeAllStandings();
-      final groupStandings = standings['Group $groupLetter'];
-      if (groupStandings != null && pos < groupStandings.length) {
-        return groupStandings[pos]['team'] as String;
-      }
-      return code;
-    }
-
-    // 3rd-place slot: "3A/B/C/D/F"
-    if (code.startsWith('3')) {
-      return _resolveBest3rd(code) ?? code;
-    }
-
-    return code;
-  }
-
-  String? _matchWinner(int matchNum) {
-    final match = _matchByNum(matchNum);
-    if (match == null) return null;
-    final result = _results[match.matchKey];
-    if (result == null) return null;
-    // Resolve the team codes of the match first
-    final t1 = resolveCode(match.team1);
-    final t2 = resolveCode(match.team2);
-    return result[0] >= result[1] ? t1 : t2;
-  }
-
-  String? _matchLoser(int matchNum) {
-    final match = _matchByNum(matchNum);
-    if (match == null) return null;
-    final result = _results[match.matchKey];
-    if (result == null) return null;
-    final t1 = resolveCode(match.team1);
-    final t2 = resolveCode(match.team2);
-    return result[0] >= result[1] ? t2 : t1;
-  }
+  String resolveCode(String code) => _resolver.resolve(code);
 
   Match? _matchByNum(int num) {
     try {
@@ -277,49 +186,8 @@ class SimulatorProvider extends ChangeNotifier {
     }
   }
 
-  // Track which 3rd-place teams have been assigned (to avoid duplicates)
-  final Set<String> _assigned3rd = {};
-
-  String? _resolveBest3rd(String code) {
-    // Parse allowed groups from "3A/B/C/D/F"
-    final letters = code.substring(1).split('/');
-    final allowedGroups = letters.map((l) => 'Group $l').toSet();
-
-    final standings = computeAllStandings();
-    final candidates = <Map<String, dynamic>>[];
-
-    for (final entry in standings.entries) {
-      if (!allowedGroups.contains(entry.key)) continue;
-      if (entry.value.length >= 3) {
-        final third = Map<String, dynamic>.from(entry.value[2]);
-        third['group'] = entry.key;
-        candidates.add(third);
-      }
-    }
-
-    // Sort: pts desc, sg desc, gp desc
-    candidates.sort((a, b) {
-      int c = (b['pts'] as int).compareTo(a['pts'] as int);
-      if (c != 0) return c;
-      c = (b['sg'] as int).compareTo(a['sg'] as int);
-      if (c != 0) return c;
-      return (b['gp'] as int).compareTo(a['gp'] as int);
-    });
-
-    // Find first unassigned
-    for (final c in candidates) {
-      final team = c['team'] as String;
-      if (!_assigned3rd.contains(team)) {
-        _assigned3rd.add(team);
-        return team;
-      }
-    }
-
-    return candidates.isNotEmpty ? candidates.first['team'] as String : null;
-  }
-
   /// Clears the 3rd-place assignment cache (call before resolving bracket).
-  void reset3rdAssignment() => _assigned3rd.clear();
+  void reset3rdAssignment() => _resolver.resetThirdPlaceAssignment();
 
   // ── Projected champion & results ──────────────────────────────────────────
 

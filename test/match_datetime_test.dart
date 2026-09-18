@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:calmcup/models/match.dart';
-import 'package:calmcup/services/world_cup_api_service.dart';
+import 'package:calmcup/services/openfootball_json_service.dart';
 
 /// Amostra com o MESMO formato do arquivo real da Copa 2026
 /// (https://github.com/openfootball/worldcup.json) — horários no formato
@@ -23,7 +23,7 @@ const _raw2026 = '''
 ''';
 
 void main() {
-  final api = WorldCupApiService();
+  final api = OpenFootballJsonService();
 
   group('Copa 2026 — parsing dos horários "HH:MM UTC-X"', () {
     test('parseMatchesFromRaw não lança e lê todas as partidas', () {

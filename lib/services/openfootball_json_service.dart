@@ -6,11 +6,17 @@ import '../models/stadium.dart';
 import '../models/group.dart';
 import '../models/score.dart';
 
-class WorldCupApiService {
+/// Busca e parseia dados no schema JSON usado pelos repositórios do
+/// openfootball (`worldcup.json`, `euro.json`, `football.json`) — o mesmo
+/// formato de partida (`round`/`date`/`time`/`team1`/`team2`/`score`/`group`)
+/// se repete em Copa do Mundo, Eurocopa, Champions League e nas principais
+/// ligas europeias, então um único parser atende todas.
+class OpenFootballJsonService {
   static const _base =
       'https://raw.githubusercontent.com/openfootball/worldcup.json/master';
 
-  // Fonte secundária de placares (camada sobreposta ao openfootball).
+  // Fonte secundária de placares (camada sobreposta ao openfootball, só usada
+  // pela Copa 2026).
   static const _liveBase =
       'https://raw.githubusercontent.com/rezarahiminia/worldcup2026/main';
 
@@ -24,16 +30,24 @@ class WorldCupApiService {
   static const List<int> historicalYears = [
     1930, 1934, 1938, 1950, 1954, 1958, 1962, 1966, 1970, 1974,
     1978, 1982, 1986, 1990, 1994, 1998, 2002, 2006, 2010, 2014,
-    2018, 2022,
+    2018, 2022, 2026,
   ];
 
-  Future<String> fetchMatchesRaw(int year) async {
-    final url = Uri.parse('$_base/$year/worldcup.json');
-    final response = await http.get(url).timeout(const Duration(seconds: 10));
+  /// Busca o JSON de partidas de qualquer URL nesse schema (Euro, ligas,
+  /// Champions League...). Base para `fetchMatchesRaw(year)`, que é só o caso
+  /// específico da Copa do Mundo.
+  Future<String> fetchMatchesRawFromUrl(String url) async {
+    final response =
+        await http.get(Uri.parse(url)).timeout(const Duration(seconds: 10));
     if (response.statusCode == 404) throw Exception('NOT_FOUND');
-    if (response.statusCode != 200) throw Exception('Erro ao carregar Copa $year');
+    if (response.statusCode != 200) {
+      throw Exception('Erro ao carregar dados');
+    }
     return response.body;
   }
+
+  Future<String> fetchMatchesRaw(int year) =>
+      fetchMatchesRawFromUrl('$_base/$year/worldcup.json');
 
   List<Match> parseMatchesFromRaw(String raw) {
     final data = json.decode(raw) as Map<String, dynamic>;
@@ -102,6 +116,7 @@ class WorldCupApiService {
   }
 
   // ── Placares ao vivo (fonte secundária: rezarahiminia/worldcup2026) ──────────
+  // Só usado pela Copa 2026 — as demais competições não têm overlay ao vivo.
 
   /// Busca os placares de jogos já iniciados/finalizados e retorna um mapa
   /// `matchKey -> Score` na MESMA orientação usada pelo openfootball.

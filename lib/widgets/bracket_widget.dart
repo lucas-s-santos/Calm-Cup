@@ -21,7 +21,7 @@ class BracketWidget extends StatelessWidget {
                 width: 72,
                 height: 72,
                 decoration: BoxDecoration(
-                  color: const Color(0xFF1A472A).withValues(alpha: 0.3),
+                  color: const Color(0xFF1E1E1E).withValues(alpha: 0.3),
                   shape: BoxShape.circle,
                 ),
                 child: const Center(
@@ -142,7 +142,7 @@ class _RoundLabel extends StatelessWidget {
       decoration: BoxDecoration(
         color: isFinal
             ? const Color(0xFFFFD700).withValues(alpha: 0.15)
-            : const Color(0xFF1A472A),
+            : const Color(0xFF1E1E1E),
         borderRadius: BorderRadius.circular(6),
         border: isFinal
             ? Border.all(
@@ -198,7 +198,7 @@ class _BracketMatchCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: highlight
             ? const Color(0xFF1E1A00)
-            : const Color(0xFF1A2A1A),
+            : const Color(0xFF1A1A1A),
         borderRadius: BorderRadius.circular(9),
         border: Border.all(
           color: highlight
@@ -321,7 +321,7 @@ class _ConnectorPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = const Color(0xFF2A4A2A)
+      ..color = const Color(0xFF2E2E2E)
       ..strokeWidth = 1.5
       ..style = PaintingStyle.stroke;
 

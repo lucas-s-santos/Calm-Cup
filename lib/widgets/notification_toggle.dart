@@ -58,7 +58,7 @@ class _NotificationToggleState extends State<NotificationToggle> {
       SnackBar(
         content: Text(msg),
         duration: const Duration(seconds: 3),
-        backgroundColor: const Color(0xFF1A472A),
+        backgroundColor: const Color(0xFF1E1E1E),
         behavior: SnackBarBehavior.floating,
       ),
     );

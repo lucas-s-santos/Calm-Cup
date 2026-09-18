@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:calmcup/models/goal.dart';
-import 'package:calmcup/services/world_cup_api_service.dart';
+import 'package:calmcup/services/openfootball_json_service.dart';
 
 // Reproduz o payload real do openfootball 2026, em que o minuto do gol vem como
 // STRING ("9") e o placar como número. Antes da correção, `minute as int`
@@ -21,7 +21,7 @@ const _raw = '''
 ''';
 
 void main() {
-  final api = WorldCupApiService();
+  final api = OpenFootballJsonService();
 
   test('parseia gol com minute em String (payload real openfootball 2026)', () {
     final matches = api.parseMatchesFromRaw(_raw);

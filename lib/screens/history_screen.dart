@@ -1,24 +1,49 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../data/competitions_catalog.dart';
+import '../models/competition.dart';
 import '../providers/history_provider.dart';
+import '../providers/today_matches_provider.dart';
+import '../services/openfootball_json_service.dart';
+import 'competition_screen.dart';
 import 'copa_detail_screen.dart';
 
 class HistoryScreen extends StatelessWidget {
   const HistoryScreen({super.key});
 
-  static const _allYears = [
-    1930, 1934, 1938, 1950, 1954, 1958, 1962, 1966, 1970, 1974,
-    1978, 1982, 1986, 1990, 1994, 1998, 2002, 2006, 2010, 2014,
-    2018, 2022, 2026,
-  ];
+  static const _allYears = OpenFootballJsonService.historicalYears;
 
   @override
   Widget build(BuildContext context) {
+    final todayProvider = context.watch<TodayMatchesProvider>();
+    final pastCompetitions = competitionsCatalog
+        .where((c) => !todayProvider.isCurrentlyRunning(c.id))
+        .toList();
+
     return Scaffold(
-      backgroundColor: const Color(0xFF0D1A0D),
+      backgroundColor: const Color(0xFF121212),
       appBar: AppBar(
-        backgroundColor: const Color(0xFF1A472A),
+        backgroundColor: const Color(0xFF1E1E1E),
         title: const Text('📖 História da Copa',
             style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        actions: [
+          if (pastCompetitions.isNotEmpty)
+            PopupMenuButton<Competition>(
+              tooltip: 'Outros campeonatos encerrados',
+              icon: const Icon(Icons.emoji_events_outlined, color: Colors.white),
+              onSelected: (c) => Navigator.push(
+                context,
+                MaterialPageRoute(
+                    builder: (_) => CompetitionScreen(competition: c)),
+              ),
+              itemBuilder: (context) => pastCompetitions
+                  .map((c) => PopupMenuItem<Competition>(
+                        value: c,
+                        child: Text('${c.emoji} ${c.name}'),
+                      ))
+                  .toList(),
+            ),
+        ],
       ),
       body: ListView.builder(
         padding: const EdgeInsets.all(16),
@@ -26,7 +51,6 @@ class HistoryScreen extends StatelessWidget {
         itemBuilder: (ctx, i) {
           final year = _allYears[_allYears.length - 1 - i]; // mais recente primeiro
           final info = worldCupInfo[year];
-          final isCurrent = year == 2026;
 
           return GestureDetector(
             onTap: () => Navigator.push(
@@ -38,19 +62,13 @@ class HistoryScreen extends StatelessWidget {
             child: Container(
               margin: const EdgeInsets.only(bottom: 12),
               decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: isCurrent
-                      ? [const Color(0xFF1A472A), const Color(0xFF0D2A1A)]
-                      : [const Color(0xFF1E2D1E), const Color(0xFF162316)],
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF202020), Color(0xFF162316)],
                   begin: Alignment.centerLeft,
                   end: Alignment.centerRight,
                 ),
                 borderRadius: BorderRadius.circular(14),
-                border: Border.all(
-                  color: isCurrent
-                      ? const Color(0xFFFFD700).withValues(alpha: 0.6)
-                      : Colors.white12,
-                ),
+                border: Border.all(color: Colors.white12),
               ),
               child: Padding(
                 padding: const EdgeInsets.all(16),
@@ -61,10 +79,8 @@ class HistoryScreen extends StatelessWidget {
                       width: 56,
                       child: Text(
                         '$year',
-                        style: TextStyle(
-                          color: isCurrent
-                              ? const Color(0xFFFFD700)
-                              : Colors.white54,
+                        style: const TextStyle(
+                          color: Colors.white54,
                           fontSize: 22,
                           fontWeight: FontWeight.bold,
                         ),
@@ -98,15 +114,6 @@ class HistoryScreen extends StatelessWidget {
                             style: const TextStyle(
                                 color: Colors.white54, fontSize: 12),
                           ),
-                          if (isCurrent)
-                            const Padding(
-                              padding: EdgeInsets.only(top: 4),
-                              child: Text(
-                                'Em andamento • EUA/México/Canadá',
-                                style: TextStyle(
-                                    color: Color(0xFFFFD700), fontSize: 11),
-                              ),
-                            ),
                         ],
                       ),
                     ),

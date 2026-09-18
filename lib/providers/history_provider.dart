@@ -1,6 +1,6 @@
 import 'package:flutter/foundation.dart';
 import '../models/match.dart';
-import '../services/world_cup_api_service.dart';
+import '../services/openfootball_json_service.dart';
 
 // Campeões hardcoded para exibição rápida na lista histórica
 const Map<int, Map<String, String>> worldCupInfo = {
@@ -26,11 +26,11 @@ const Map<int, Map<String, String>> worldCupInfo = {
   2014: {'champion': 'Alemanha', 'host': 'Brasil', 'flag': '🇩🇪'},
   2018: {'champion': 'França', 'host': 'Rússia', 'flag': '🇫🇷'},
   2022: {'champion': 'Argentina', 'host': 'Catar', 'flag': '🇦🇷'},
-  2026: {'champion': '?', 'host': 'EUA/México/Canadá', 'flag': '🏆'},
+  2026: {'champion': 'Espanha', 'host': 'EUA/México/Canadá', 'flag': '🇪🇸'},
 };
 
 class HistoryProvider extends ChangeNotifier {
-  final WorldCupApiService _api = WorldCupApiService();
+  final OpenFootballJsonService _api = OpenFootballJsonService();
 
   final Map<int, List<Match>> _matchCache = {};
   final Map<int, bool> _loadingMap = {};
@@ -137,7 +137,7 @@ class HistoryProvider extends ChangeNotifier {
 
   // Carrega todas as copas disponíveis para estatísticas completas
   Future<void> loadStatsYears() async {
-    await Future.wait(WorldCupApiService.historicalYears.map(loadYear));
+    await Future.wait(OpenFootballJsonService.historicalYears.map(loadYear));
   }
 
   // Top 5 jogos com mais gols

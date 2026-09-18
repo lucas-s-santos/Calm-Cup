@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart' show Color;
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -21,6 +22,10 @@ class NotificationService {
   static const _liveIdOffset = 3;
 
   Future<void> initialize() async {
+    // flutter_local_notifications e Platform.isX (dart:io) não existem na
+    // Web — o app roda sem notificações lá, sem quebrar o boot.
+    if (kIsWeb) return;
+
     tz_data.initializeTimeZones();
 
     const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
@@ -62,6 +67,7 @@ class NotificationService {
   }
 
   Future<bool> requestPermission() async {
+    if (kIsWeb) return false;
     if (Platform.isAndroid) {
       final impl = _plugin.resolvePlatformSpecificImplementation<
           AndroidFlutterLocalNotificationsPlugin>();
@@ -82,6 +88,7 @@ class NotificationService {
   }
 
   Future<void> scheduleMatchNotifications(List<Match> matches) async {
+    if (kIsWeb) return;
     await _plugin.cancelAll();
     final now = DateTime.now();
 
@@ -90,8 +97,8 @@ class NotificationService {
       final kickoff = match.dateTime;
 
       // Fase mata-mata tem duração maior (tempo extra)
-      final isKnockout = match.group == null;
-      final matchDuration = Duration(minutes: isKnockout ? 120 : 105);
+      final matchDuration =
+          Duration(minutes: match.isKnockoutStage ? 120 : 105);
 
       // Ignora jogos já encerrados
       if (kickoff.add(matchDuration).isBefore(now)) continue;
@@ -155,7 +162,7 @@ class NotificationService {
           icon: '@mipmap/ic_launcher',
           largeIcon: const DrawableResourceAndroidBitmap('@mipmap/ic_launcher'),
           styleInformation: BigTextStyleInformation(body),
-          color: const Color(0xFF1A472A),
+          color: const Color(0xFF1E1E1E),
           autoCancel: true,
         ),
       ),
@@ -191,7 +198,7 @@ class NotificationService {
           largeIcon:
               const DrawableResourceAndroidBitmap('@mipmap/ic_launcher'),
           styleInformation: BigTextStyleInformation(body),
-          color: const Color(0xFF1A472A),
+          color: const Color(0xFF1E1E1E),
         ),
       ),
       androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
@@ -201,6 +208,7 @@ class NotificationService {
   }
 
   Future<void> cancelAllNotifications() async {
+    if (kIsWeb) return;
     await _plugin.cancelAll();
   }
 }

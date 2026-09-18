@@ -5,11 +5,21 @@ import '../services/prediction_service.dart';
 
 class BolaoProvider extends ChangeNotifier {
   final _service = PredictionService();
-  Map<String, Prediction> _predictions = {};
-  bool _loaded = false;
+  final Map<String, Prediction> _predictions = {};
+  // Partidas cujo palpite salvo já foi lido do storage — permite chamar
+  // `load` de novo pra cada campeonato escolhido no Bolão sem re-ler do
+  // disco nem perder o que já foi carregado de outro campeonato (o mapa de
+  // palpites é global, mas cada partida só pertence a uma competição — as
+  // chaves não colidem entre competições diferentes).
+  final Set<String> _loadedMatchKeys = {};
 
   Map<String, Prediction> get predictions => Map.unmodifiable(_predictions);
-  bool get loaded => _loaded;
+
+  /// `true` quando todas as partidas da lista já têm seu palpite (se algum)
+  /// carregado do storage — usado pra decidir se mostra o spinner na aba
+  /// "Meus Palpites" do campeonato selecionado no momento.
+  bool isLoaded(List<Match> matches) =>
+      matches.every((m) => _loadedMatchKeys.contains(m.matchKey));
 
   int get totalPoints {
     int pts = 0;
@@ -21,9 +31,11 @@ class BolaoProvider extends ChangeNotifier {
   }
 
   Future<void> load(List<Match> matches) async {
-    if (_loaded) return;
-    _predictions = await _service.loadAll(matches);
-    _loaded = true;
+    final toFetch =
+        matches.where((m) => !_loadedMatchKeys.contains(m.matchKey)).toList();
+    if (toFetch.isEmpty) return;
+    _predictions.addAll(await _service.loadAll(toFetch));
+    _loadedMatchKeys.addAll(toFetch.map((m) => m.matchKey));
     notifyListeners();
   }
 

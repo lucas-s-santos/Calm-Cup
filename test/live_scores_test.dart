@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:calmcup/services/world_cup_api_service.dart';
+import 'package:calmcup/services/openfootball_json_service.dart';
 
 // Times no formato do rezarahiminia (inclui um caso de apelido: United States).
 const _rzTeams = '''
@@ -36,7 +36,7 @@ const _ofMatches = '''
 ''';
 
 void main() {
-  final api = WorldCupApiService();
+  final api = OpenFootballJsonService();
 
   group('parseLiveScores', () {
     test('inclui finalizados e em andamento; exclui não iniciados', () {

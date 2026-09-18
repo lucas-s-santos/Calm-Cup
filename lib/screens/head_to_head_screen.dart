@@ -4,7 +4,7 @@ import 'package:intl/intl.dart';
 import '../providers/copa_2026_provider.dart';
 import '../providers/history_provider.dart';
 import '../models/match.dart';
-import '../services/world_cup_api_service.dart';
+import '../services/openfootball_json_service.dart';
 import '../utils/team_flags.dart';
 import '../utils/team_names_pt.dart';
 import 'match_detail_screen.dart';
@@ -42,7 +42,7 @@ class _HeadToHeadScreenState extends State<HeadToHeadScreen> {
     for (final t in copa.teams) {
       names.add(t.name);
     }
-    for (final year in WorldCupApiService.historicalYears) {
+    for (final year in OpenFootballJsonService.historicalYears) {
       for (final m in history.getMatches(year)) {
         names.add(m.team1);
         names.add(m.team2);
@@ -65,7 +65,7 @@ class _HeadToHeadScreenState extends State<HeadToHeadScreen> {
     final copa = context.read<Copa2026Provider>();
     final result = <Match>[];
 
-    for (final year in WorldCupApiService.historicalYears) {
+    for (final year in OpenFootballJsonService.historicalYears) {
       for (final m in history.getMatches(year)) {
         if (_isH2H(m)) result.add(m);
       }
@@ -107,9 +107,9 @@ class _HeadToHeadScreenState extends State<HeadToHeadScreen> {
     final name2 = _team2 != null ? TeamNamesPt.translate(_team2!) : '—';
 
     return Scaffold(
-      backgroundColor: const Color(0xFF0D1A0D),
+      backgroundColor: const Color(0xFF121212),
       appBar: AppBar(
-        backgroundColor: const Color(0xFF1A472A),
+        backgroundColor: const Color(0xFF1E1E1E),
         iconTheme: const IconThemeData(color: Colors.white),
         title: const Text('Confronto Direto',
             style: TextStyle(
@@ -125,7 +125,7 @@ class _HeadToHeadScreenState extends State<HeadToHeadScreen> {
                 const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             decoration: const BoxDecoration(
               gradient: LinearGradient(
-                colors: [Color(0xFF1A472A), Color(0xFF0D2A0D)],
+                colors: [Color(0xFF1E1E1E), Color(0xFF0D2A0D)],
               ),
             ),
             child: Row(
@@ -162,7 +162,7 @@ class _HeadToHeadScreenState extends State<HeadToHeadScreen> {
           if (_team1 != null && _team2 != null) ...[
             Container(
               padding: const EdgeInsets.symmetric(vertical: 16),
-              color: const Color(0xFF131F13),
+              color: const Color(0xFF181818),
               child: _loadingHistory
                   ? const Center(
                       child: CircularProgressIndicator(
@@ -171,11 +171,11 @@ class _HeadToHeadScreenState extends State<HeadToHeadScreen> {
                       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                       children: [
                         _RecordStat('${record['w1']}',
-                            '$flag1 Vitórias', const Color(0xFF4CAF50)),
+                            '$flag1 Vitórias', const Color(0xFF22C55E)),
                         _RecordStat(
                             '${record['d']}', 'Empates', Colors.white54),
                         _RecordStat('${record['w2']}',
-                            '$flag2 Vitórias', const Color(0xFFFF6B6B)),
+                            '$flag2 Vitórias', const Color(0xFFEF4444)),
                         _RecordStat(
                             '${record['g1']}×${record['g2']}',
                             'Placar total',
@@ -259,7 +259,7 @@ class _TeamPicker extends StatelessWidget {
         padding:
             const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         decoration: BoxDecoration(
-          color: const Color(0xFF0D1A0D).withValues(alpha: 0.6),
+          color: const Color(0xFF121212).withValues(alpha: 0.6),
           borderRadius: BorderRadius.circular(10),
           border: Border.all(
               color: selected != null
@@ -296,7 +296,7 @@ class _TeamPicker extends StatelessWidget {
   void _showSearch(BuildContext context) {
     showModalBottomSheet(
       context: context,
-      backgroundColor: const Color(0xFF1A2A1A),
+      backgroundColor: const Color(0xFF1A1A1A),
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
@@ -348,7 +348,7 @@ class _TeamSearchSheetState extends State<_TeamSearchSheet> {
                 prefixIcon: const Icon(Icons.search,
                     color: Colors.white38),
                 filled: true,
-                fillColor: const Color(0xFF0D1A0D),
+                fillColor: const Color(0xFF121212),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(10),
                   borderSide: BorderSide.none,
@@ -436,9 +436,9 @@ class _H2HMatchTile extends StatelessWidget {
       final s2 = isFirst ? match.score!.ft[1] : match.score!.ft[0];
       scoreStr = '$s1 – $s2';
       scoreColor = s1 > s2
-          ? const Color(0xFF4CAF50)
+          ? const Color(0xFF22C55E)
           : s1 < s2
-              ? const Color(0xFFFF6B6B)
+              ? const Color(0xFFEF4444)
               : Colors.white54;
     }
 

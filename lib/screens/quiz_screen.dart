@@ -129,9 +129,9 @@ class _QuizScreenState extends State<QuizScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF0D1A0D),
+      backgroundColor: const Color(0xFF121212),
       appBar: AppBar(
-        backgroundColor: const Color(0xFF1A472A),
+        backgroundColor: const Color(0xFF1E1E1E),
         title: const Text('🧠 Quiz Copa do Mundo',
             style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
         iconTheme: const IconThemeData(color: Colors.white),
@@ -167,7 +167,7 @@ class _QuizScreenState extends State<QuizScreen> {
                   borderRadius: BorderRadius.circular(4),
                   child: LinearProgressIndicator(
                     value: progress,
-                    backgroundColor: const Color(0xFF1E2D1E),
+                    backgroundColor: const Color(0xFF202020),
                     color: const Color(0xFFFFD700),
                     minHeight: 8,
                   ),
@@ -187,7 +187,7 @@ class _QuizScreenState extends State<QuizScreen> {
             width: double.infinity,
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
-              color: const Color(0xFF1A472A),
+              color: const Color(0xFF1E1E1E),
               borderRadius: BorderRadius.circular(16),
             ),
             child: Text(
@@ -227,7 +227,7 @@ class _QuizScreenState extends State<QuizScreen> {
                 padding: const EdgeInsets.symmetric(
                     horizontal: 20, vertical: 16),
                 decoration: BoxDecoration(
-                  color: bgColor ?? const Color(0xFF1E2D1E),
+                  color: bgColor ?? const Color(0xFF202020),
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(color: borderColor),
                 ),

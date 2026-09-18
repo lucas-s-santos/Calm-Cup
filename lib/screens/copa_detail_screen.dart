@@ -39,12 +39,12 @@ class _CopaDetailScreenState extends State<CopaDetailScreen> {
     final rounds = grouped.keys.toList();
 
     return Scaffold(
-      backgroundColor: const Color(0xFF0D1A0D),
+      backgroundColor: const Color(0xFF121212),
       body: CustomScrollView(
         slivers: [
           SliverAppBar(
             pinned: true,
-            backgroundColor: const Color(0xFF1A472A),
+            backgroundColor: const Color(0xFF1E1E1E),
             iconTheme: const IconThemeData(color: Colors.white),
             title: Text(
               'Copa ${widget.year}',
@@ -60,7 +60,7 @@ class _CopaDetailScreenState extends State<CopaDetailScreen> {
                     const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
                 decoration: BoxDecoration(
                   gradient: const LinearGradient(
-                    colors: [Color(0xFF1A472A), Color(0xFF0D2A1A)],
+                    colors: [Color(0xFF1E1E1E), Color(0xFF0D2A1A)],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ),
@@ -170,7 +170,7 @@ class _CopaDetailScreenState extends State<CopaDetailScreen> {
                         padding: const EdgeInsets.symmetric(
                             horizontal: 14, vertical: 10),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF1E2D1E),
+                          color: const Color(0xFF202020),
                           borderRadius: BorderRadius.circular(10),
                           border: i == 0
                               ? Border.all(

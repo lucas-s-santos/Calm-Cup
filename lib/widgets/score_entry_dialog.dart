@@ -43,7 +43,7 @@ class _ScoreEntryDialogState extends State<ScoreEntryDialog> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return AlertDialog(
-      backgroundColor: const Color(0xFF1E2D1E),
+      backgroundColor: const Color(0xFF202020),
       title: Text(
         '${widget.match.team1} x ${widget.match.team2}',
         style: const TextStyle(color: Colors.white, fontSize: 16),

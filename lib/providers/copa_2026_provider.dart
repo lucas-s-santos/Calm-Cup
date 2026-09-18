@@ -6,12 +6,14 @@ import '../models/stadium.dart';
 import '../models/group.dart';
 import '../models/local_result.dart';
 import '../models/score.dart';
-import '../services/world_cup_api_service.dart';
+import '../services/openfootball_json_service.dart';
 import '../services/local_storage_service.dart';
 import '../services/notification_service.dart';
+import '../utils/bracket_code_resolver.dart';
+import '../utils/standings_calculator.dart';
 
 class Copa2026Provider extends ChangeNotifier {
-  final WorldCupApiService _api = WorldCupApiService();
+  final OpenFootballJsonService _api = OpenFootballJsonService();
   final LocalStorageService _local = LocalStorageService();
   Timer? _liveTimer;
 
@@ -319,13 +321,19 @@ class Copa2026Provider extends ChangeNotifier {
   List<Match> get thirdPlace => _roundSorted('Match for third place');
   List<Match> get finalMatch => _roundSorted('Final');
 
-  // Classificação em cache + 3ºs já atribuídos: preenchidos por prepareBracket(),
-  // chamado uma vez antes de montar o chaveamento na UI.
-  final Set<String> _assigned3rd = {};
+  // Classificação em cache: preenchida por prepareBracket(), chamado uma vez
+  // antes de montar o chaveamento na UI.
   Map<String, List<Map<String, dynamic>>> _standingsCache = {};
 
+  late final BracketCodeResolver _resolver = BracketCodeResolver(
+    matchByNum: _matchByNum,
+    resultOf: bracketResult,
+    standingsByGroup: () => _standingsCache,
+    winnerIndex: _winnerIndex,
+  );
+
   void prepareBracket() {
-    _assigned3rd.clear();
+    _resolver.resetThirdPlaceAssignment();
     _standingsCache = {
       for (final g in _groups) g.name: getGroupStandings(g.name),
     };
@@ -342,36 +350,10 @@ class Copa2026Provider extends ChangeNotifier {
 
   /// Resolve um código de chaveamento para o nome real da seleção, ou retorna
   /// o próprio código quando ainda indefinido.
-  String resolveBracketCode(String code) {
-    final w = RegExp(r'^W(\d+)$').firstMatch(code);
-    if (w != null) return _matchWinner(int.parse(w.group(1)!)) ?? code;
-
-    final l = RegExp(r'^L(\d+)$').firstMatch(code);
-    if (l != null) return _matchLoser(int.parse(l.group(1)!)) ?? code;
-
-    final pos = RegExp(r'^([12])([A-L])$').firstMatch(code);
-    if (pos != null) {
-      final idx = int.parse(pos.group(1)!) - 1;
-      final standings = _standingsCache['Group ${pos.group(2)}'];
-      if (standings != null && idx < standings.length) {
-        return standings[idx]['team'] as String;
-      }
-      return code;
-    }
-
-    if (code.startsWith('3')) return _resolveBest3rd(code) ?? code;
-
-    return code;
-  }
-
-  // Detecta os placeholders do chaveamento: "1A"/"2B" (posição no grupo),
-  // "W73"/"L101" (vencedor/perdedor de jogo) e "3A/B/C/D" (melhor 3º). Tudo
-  // que NÃO casa com esses padrões é nome real de seleção.
-  static final RegExp _codeRe =
-      RegExp(r'^([12][A-L]|[WL]\d+|3[A-L](/[A-L])*)$');
+  String resolveBracketCode(String code) => _resolver.resolve(code);
 
   /// `true` quando o valor ainda é um código não resolvido (mostrar "A definir").
-  bool isCode(String value) => _codeRe.hasMatch(value);
+  bool isCode(String value) => BracketCodeResolver.isCode(value);
 
   Match? _matchByNum(int num) {
     try {
@@ -387,52 +369,6 @@ class Copa2026Provider extends ChangeNotifier {
     if (r[0] != r[1]) return r[0] > r[1] ? 0 : 1;
     final p = m.score?.p;
     if (p != null && p.length == 2 && p[0] != p[1]) return p[0] > p[1] ? 0 : 1;
-    return null;
-  }
-
-  String? _matchWinner(int num) {
-    final m = _matchByNum(num);
-    if (m == null) return null;
-    final r = bracketResult(m);
-    if (r == null) return null;
-    final w = _winnerIndex(m, r);
-    if (w == null) return null;
-    return resolveBracketCode(w == 0 ? m.team1 : m.team2);
-  }
-
-  String? _matchLoser(int num) {
-    final m = _matchByNum(num);
-    if (m == null) return null;
-    final r = bracketResult(m);
-    if (r == null) return null;
-    final w = _winnerIndex(m, r);
-    if (w == null) return null;
-    return resolveBracketCode(w == 0 ? m.team2 : m.team1);
-  }
-
-  // Melhor 3º colocado entre os grupos do código "3A/B/C/...", evitando repetir
-  // um time já atribuído a outra vaga (mesma heurística do simulador).
-  String? _resolveBest3rd(String code) {
-    final allowed = code.substring(1).split('/').map((l) => 'Group $l').toSet();
-    final candidates = <Map<String, dynamic>>[];
-    for (final entry in _standingsCache.entries) {
-      if (!allowed.contains(entry.key)) continue;
-      if (entry.value.length >= 3) candidates.add(entry.value[2]);
-    }
-    candidates.sort((a, b) {
-      int c = (b['pts'] as int).compareTo(a['pts'] as int);
-      if (c != 0) return c;
-      c = (b['sg'] as int).compareTo(a['sg'] as int);
-      if (c != 0) return c;
-      return (b['gp'] as int).compareTo(a['gp'] as int);
-    });
-    for (final c in candidates) {
-      final team = c['team'] as String;
-      if (!_assigned3rd.contains(team)) {
-        _assigned3rd.add(team);
-        return team;
-      }
-    }
     return null;
   }
 
@@ -452,94 +388,27 @@ class Copa2026Provider extends ChangeNotifier {
         .where((m) => m.group == groupName && m.isGroupStage)
         .toList();
 
-    final Map<String, Map<String, int>> standings = {};
-
-    void addTeam(String team) {
-      standings.putIfAbsent(
-          team,
-          () =>
-              {'pts': 0, 'pj': 0, 'v': 0, 'e': 0, 'd': 0, 'gp': 0, 'gc': 0});
-    }
-
-    for (final match in groupMatches) {
-      final localResult = _localResults[match.matchKey];
-      final apiScore = match.score;
-
-      // Prioridade igual à dos cards: placar automático (rezarahiminia ->
-      // openfootball) tem precedência; o manual preenche quando não há oficial.
-      int? g1, g2;
-      if (apiScore?.hasResult == true) {
-        g1 = apiScore!.ft[0];
-        g2 = apiScore.ft[1];
-      } else if (localResult != null) {
-        g1 = localResult.score1;
-        g2 = localResult.score2;
-      }
-
-      if (g1 == null || g2 == null) continue;
-
-      addTeam(match.team1);
-      addTeam(match.team2);
-
-      standings[match.team1]!['pj'] = standings[match.team1]!['pj']! + 1;
-      standings[match.team2]!['pj'] = standings[match.team2]!['pj']! + 1;
-      standings[match.team1]!['gp'] = standings[match.team1]!['gp']! + g1;
-      standings[match.team1]!['gc'] = standings[match.team1]!['gc']! + g2;
-      standings[match.team2]!['gp'] = standings[match.team2]!['gp']! + g2;
-      standings[match.team2]!['gc'] = standings[match.team2]!['gc']! + g1;
-
-      if (g1 > g2) {
-        standings[match.team1]!['pts'] = standings[match.team1]!['pts']! + 3;
-        standings[match.team1]!['v'] = standings[match.team1]!['v']! + 1;
-        standings[match.team2]!['d'] = standings[match.team2]!['d']! + 1;
-      } else if (g1 == g2) {
-        standings[match.team1]!['pts'] = standings[match.team1]!['pts']! + 1;
-        standings[match.team2]!['pts'] = standings[match.team2]!['pts']! + 1;
-        standings[match.team1]!['e'] = standings[match.team1]!['e']! + 1;
-        standings[match.team2]!['e'] = standings[match.team2]!['e']! + 1;
-      } else {
-        standings[match.team2]!['pts'] = standings[match.team2]!['pts']! + 3;
-        standings[match.team2]!['v'] = standings[match.team2]!['v']! + 1;
-        standings[match.team1]!['d'] = standings[match.team1]!['d']! + 1;
-      }
-    }
-
     final group = _groups.firstWhere(
       (g) => g.name == groupName,
       orElse: () => Group(name: groupName, teams: []),
     );
-    for (final team in group.teams) {
-      addTeam(team);
-    }
 
-    final list = standings.entries.map((e) {
+    // Prioridade igual à dos cards: placar automático (rezarahiminia ->
+    // openfootball) tem precedência; o manual (bracketResult) preenche
+    // quando não há oficial.
+    final standings = computeStandings(
+      groupMatches,
+      scoreOf: bracketResult,
+      knownTeams: group.teams,
+    );
+
+    return standings.map((row) {
+      final teamName = row['team'] as String;
       final team = _teams.firstWhere(
-        (t) => t.name == e.key || t.nameNormalised == e.key,
-        orElse: () => Team(
-          name: e.key,
-          continent: '',
-          flagIcon: '🏳️',
-          fifaCode: '',
-          group: groupName,
-          confed: '',
-        ),
+        (t) => t.name == teamName || t.nameNormalised == teamName,
+        orElse: () => Team(name: teamName, flagIcon: '🏳️'),
       );
-      return {
-        'team': e.key,
-        'flag': team.flagIcon,
-        ...e.value,
-        'sg': (e.value['gp']! - e.value['gc']!),
-      };
+      return {...row, 'flag': team.flagIcon};
     }).toList();
-
-    list.sort((a, b) {
-      int cmp = (b['pts'] as int).compareTo(a['pts'] as int);
-      if (cmp != 0) return cmp;
-      cmp = (b['sg'] as int).compareTo(a['sg'] as int);
-      if (cmp != 0) return cmp;
-      return (b['gp'] as int).compareTo(a['gp'] as int);
-    });
-
-    return list;
   }
 }

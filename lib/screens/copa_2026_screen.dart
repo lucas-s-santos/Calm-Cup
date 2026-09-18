@@ -43,14 +43,14 @@ class _Copa2026ScreenState extends State<Copa2026Screen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF0D1A0D),
+      backgroundColor: const Color(0xFF121212),
       appBar: AppBar(
-        backgroundColor: const Color(0xFF1A472A),
+        backgroundColor: const Color(0xFF1E1E1E),
         title: Row(
           children: [
             Image.asset(
-              'logo2.png',
-              height: 28,
+              'logoCampeonatos_icon.png',
+              height: 32,
               errorBuilder: (_, _, _) =>
                   const Text('🏆', style: TextStyle(fontSize: 22)),
             ),
@@ -203,7 +203,7 @@ class _TodayTab extends StatelessWidget {
                   width: 80,
                   height: 80,
                   decoration: BoxDecoration(
-                    color: const Color(0xFF1A472A).withValues(alpha: 0.3),
+                    color: const Color(0xFF1E1E1E).withValues(alpha: 0.3),
                     shape: BoxShape.circle,
                   ),
                   child: const Center(
@@ -350,7 +350,7 @@ class _GroupsTab extends StatelessWidget {
         return Container(
           margin: const EdgeInsets.fromLTRB(12, 0, 12, 12),
           decoration: BoxDecoration(
-            color: const Color(0xFF131F13),
+            color: const Color(0xFF181818),
             borderRadius: BorderRadius.circular(14),
             border: Border.all(color: Colors.white12),
           ),
@@ -360,7 +360,7 @@ class _GroupsTab extends StatelessWidget {
                 padding:
                     const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                 decoration: const BoxDecoration(
-                  color: Color(0xFF1A472A),
+                  color: Color(0xFF1E1E1E),
                   borderRadius:
                       BorderRadius.vertical(top: Radius.circular(13)),
                 ),
@@ -425,7 +425,7 @@ class _GroupsTab extends StatelessWidget {
                 return Container(
                   decoration: BoxDecoration(
                     color: qualified
-                        ? const Color(0xFF1A472A).withValues(alpha: 0.25)
+                        ? const Color(0xFF1E1E1E).withValues(alpha: 0.25)
                         : null,
                     borderRadius: idx == standings.length - 1
                         ? const BorderRadius.vertical(
@@ -550,8 +550,8 @@ class _ScorersTab extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
           decoration: BoxDecoration(
             color: i < 3
-                ? const Color(0xFF1A472A).withValues(alpha: 0.3)
-                : const Color(0xFF131F13),
+                ? const Color(0xFF1E1E1E).withValues(alpha: 0.3)
+                : const Color(0xFF181818),
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
               color: i == 0
@@ -663,7 +663,7 @@ class _CountryStadiums extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.fromLTRB(12, 0, 12, 12),
       decoration: BoxDecoration(
-        color: const Color(0xFF131F13),
+        color: const Color(0xFF181818),
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: Colors.white12),
       ),
@@ -672,7 +672,7 @@ class _CountryStadiums extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
             decoration: const BoxDecoration(
-              color: Color(0xFF1A3A1A),
+              color: Color(0xFF262626),
               borderRadius: BorderRadius.vertical(top: Radius.circular(13)),
             ),
             child: Row(
@@ -735,7 +735,7 @@ class _CountryStadiums extends StatelessWidget {
                     width: 40,
                     height: 40,
                     decoration: BoxDecoration(
-                      color: const Color(0xFF1A472A).withValues(alpha: 0.3),
+                      color: const Color(0xFF1E1E1E).withValues(alpha: 0.3),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: const Center(
@@ -873,7 +873,7 @@ class _TeamsTab extends StatelessWidget {
         return Container(
           margin: const EdgeInsets.fromLTRB(12, 0, 12, 12),
           decoration: BoxDecoration(
-            color: const Color(0xFF131F13),
+            color: const Color(0xFF181818),
             borderRadius: BorderRadius.circular(14),
             border: Border.all(color: Colors.white12),
           ),
@@ -884,7 +884,7 @@ class _TeamsTab extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(
                     horizontal: 14, vertical: 10),
                 decoration: const BoxDecoration(
-                  color: Color(0xFF1A3A1A),
+                  color: Color(0xFF262626),
                   borderRadius:
                       BorderRadius.vertical(top: Radius.circular(13)),
                 ),
@@ -925,7 +925,7 @@ class _TeamsTab extends StatelessWidget {
                       width: 42,
                       height: 42,
                       decoration: BoxDecoration(
-                        color: const Color(0xFF1A472A).withValues(alpha: 0.3),
+                        color: const Color(0xFF1E1E1E).withValues(alpha: 0.3),
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: Center(
@@ -947,7 +947,7 @@ class _TeamsTab extends StatelessWidget {
                       padding: const EdgeInsets.symmetric(
                           horizontal: 8, vertical: 3),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF1A472A).withValues(alpha: 0.4),
+                        color: const Color(0xFF1E1E1E).withValues(alpha: 0.4),
                         borderRadius: BorderRadius.circular(6),
                       ),
                       child: Text(

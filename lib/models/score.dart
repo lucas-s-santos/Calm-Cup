@@ -8,7 +8,12 @@ class Score {
 
   const Score({required this.ft, this.ht, this.et, this.p});
 
-  factory Score.fromJson(Map<String, dynamic> json) {
+  /// Aceita tanto o formato padrão `{"ft": [...], "ht": [...]}` quanto um
+  /// array simples `[gols1, gols2]` — jogos terminados 0x0 em algumas ligas
+  /// do football.json (ex.: Premier League, Serie A) vêm assim, em vez do
+  /// objeto completo (bug de geração dos dados na fonte, confirmado contra
+  /// várias ligas 2025/26 — não é caso raro, dezenas de jogos por liga).
+  factory Score.fromJson(dynamic json) {
     List<int> parseList(dynamic val) {
       if (val == null) return [];
       return (val as List)
@@ -17,11 +22,16 @@ class Score {
           .toList();
     }
 
+    if (json is List) {
+      return Score(ft: parseList(json));
+    }
+
+    final map = json as Map<String, dynamic>;
     return Score(
-      ft: parseList(json['ft']),
-      ht: json['ht'] != null ? parseList(json['ht']) : null,
-      et: json['et'] != null ? parseList(json['et']) : null,
-      p: json['p'] != null ? parseList(json['p']) : null,
+      ft: parseList(map['ft']),
+      ht: map['ht'] != null ? parseList(map['ht']) : null,
+      et: map['et'] != null ? parseList(map['et']) : null,
+      p: map['p'] != null ? parseList(map['p']) : null,
     );
   }
 

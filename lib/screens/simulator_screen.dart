@@ -39,15 +39,15 @@ class _SimulatorScreenState extends State<SimulatorScreen>
     final provider = context.watch<SimulatorProvider>();
 
     return Scaffold(
-      backgroundColor: const Color(0xFF0D1A0D),
+      backgroundColor: const Color(0xFF121212),
       appBar: AppBar(
-        backgroundColor: const Color(0xFF1A472A),
+        backgroundColor: const Color(0xFF1E1E1E),
         iconTheme: const IconThemeData(color: Colors.white),
         title: Row(
           children: [
             Image.asset(
-              'logo2.png',
-              height: 28,
+              'logoCampeonatos_icon.png',
+              height: 32,
               errorBuilder: (_, _, _) =>
                   const Text('🎮', style: TextStyle(fontSize: 22)),
             ),
@@ -67,7 +67,7 @@ class _SimulatorScreenState extends State<SimulatorScreen>
         actions: [
           PopupMenuButton<String>(
             icon: const Icon(Icons.more_vert, color: Colors.white),
-            color: const Color(0xFF1E2D1E),
+            color: const Color(0xFF202020),
             shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12)),
             onSelected: (v) => _handleAction(context, v, provider),
@@ -182,7 +182,7 @@ class _SimulatorScreenState extends State<SimulatorScreen>
     final ok = await showDialog<bool>(
       context: ctx,
       builder: (_) => AlertDialog(
-        backgroundColor: const Color(0xFF1E2D1E),
+        backgroundColor: const Color(0xFF202020),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Text('Resetar simulação?',
             style: TextStyle(color: Colors.white)),
@@ -281,7 +281,7 @@ class _SimulatorHeader extends StatelessWidget {
                   borderRadius: BorderRadius.circular(4),
                   child: LinearProgressIndicator(
                     value: pct,
-                    backgroundColor: const Color(0xFF1E2D1E),
+                    backgroundColor: const Color(0xFF202020),
                     valueColor: AlwaysStoppedAnimation<Color>(
                       pct == 1.0
                           ? Colors.greenAccent
@@ -372,7 +372,7 @@ class _GroupsTab extends StatelessWidget {
         return Container(
           margin: const EdgeInsets.fromLTRB(12, 8, 12, 0),
           decoration: BoxDecoration(
-            color: const Color(0xFF131F13),
+            color: const Color(0xFF181818),
             borderRadius: BorderRadius.circular(14),
             border: Border.all(color: Colors.white12),
           ),
@@ -456,7 +456,7 @@ class _GroupTopTwo extends StatelessWidget {
           margin: const EdgeInsets.only(left: 4),
           padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
           decoration: BoxDecoration(
-            color: const Color(0xFF1A472A),
+            color: const Color(0xFF1E1E1E),
             borderRadius: BorderRadius.circular(6),
           ),
           child: Row(
@@ -487,7 +487,7 @@ class _StandingsTable extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.fromLTRB(12, 4, 12, 8),
       decoration: BoxDecoration(
-        color: const Color(0xFF0D1A0D),
+        color: const Color(0xFF121212),
         borderRadius: BorderRadius.circular(10),
         border: Border.all(color: Colors.white12),
       ),
@@ -523,7 +523,7 @@ class _StandingsTable extends StatelessWidget {
             return Container(
               decoration: BoxDecoration(
                 color: qualified
-                    ? const Color(0xFF1A472A).withValues(alpha: 0.25)
+                    ? const Color(0xFF1E1E1E).withValues(alpha: 0.25)
                     : maybeThird
                         ? const Color(0xFF2A3A1A).withValues(alpha: 0.2)
                         : null,
@@ -801,7 +801,7 @@ class _KnockoutTab extends StatelessWidget {
                 width: 80,
                 height: 80,
                 decoration: BoxDecoration(
-                  color: const Color(0xFF1A472A).withValues(alpha: 0.3),
+                  color: const Color(0xFF1E1E1E).withValues(alpha: 0.3),
                   shape: BoxShape.circle,
                 ),
                 child: const Center(
@@ -885,7 +885,7 @@ class _RoundHeader extends StatelessWidget {
                 colors: [Color(0xFF3A2A00), Color(0xFF2A1A00)],
               )
             : const LinearGradient(
-                colors: [Color(0xFF1A3A1A), Color(0xFF0D1A0D)],
+                colors: [Color(0xFF262626), Color(0xFF121212)],
               ),
         borderRadius: BorderRadius.circular(10),
         border: Border.all(
@@ -947,7 +947,7 @@ class _KnockoutCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: isFinal
             ? const Color(0xFF1E1A00)
-            : const Color(0xFF131F13),
+            : const Color(0xFF181818),
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
           color: isFinal
@@ -1002,7 +1002,7 @@ class _KnockoutCard extends StatelessWidget {
                     color: hasResult
                         ? const Color(0xFFFFD700)
                             .withValues(alpha: 0.12)
-                        : const Color(0xFF1A2A1A),
+                        : const Color(0xFF1A1A1A),
                     borderRadius: BorderRadius.circular(10),
                     border: Border.all(
                       color: hasResult

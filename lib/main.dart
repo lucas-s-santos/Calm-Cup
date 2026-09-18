@@ -1,18 +1,22 @@
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart'
     show kIsWeb, defaultTargetPlatform, TargetPlatform;
 import 'package:flutter/material.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:provider/provider.dart';
 import 'package:workmanager/workmanager.dart';
+import 'firebase_options.dart';
 import 'providers/copa_2026_provider.dart';
 import 'providers/history_provider.dart';
+import 'providers/ranking_provider.dart';
 import 'providers/simulator_provider.dart';
 import 'providers/bolao_provider.dart';
+import 'providers/today_matches_provider.dart';
 import 'theme/app_colors.dart';
 import 'screens/home_screen.dart';
 import 'services/notification_service.dart';
 import 'services/local_storage_service.dart';
-import 'services/world_cup_api_service.dart';
+import 'services/openfootball_json_service.dart';
 
 const _bgTaskId = 'calmcup_reschedule';
 
@@ -26,7 +30,7 @@ void _bgCallback() {
       if (!await NotificationService.instance.isEnabled) return true;
 
       final local = LocalStorageService();
-      final api = WorldCupApiService();
+      final api = OpenFootballJsonService();
 
       String? rawJson;
       try {
@@ -54,6 +58,23 @@ void main() async {
   // Pede permissão automaticamente — só mostra diálogo na primeira vez.
   // Em lançamentos subsequentes retorna imediatamente se já concedida.
   await NotificationService.instance.requestPermission();
+
+  // Firebase (ranking do Bolão) — suportado em mobile/web/macOS; Windows
+  // fica de fora (sem suporte oficial de produção do Firebase pra desktop
+  // Windows). Falha aqui nunca derruba o app: RankingProvider detecta
+  // sozinho que ficou indisponível na hora de usar e o resto do Bolão
+  // continua 100% funcional sem rede.
+  final supportsFirebase = kIsWeb ||
+      defaultTargetPlatform == TargetPlatform.android ||
+      defaultTargetPlatform == TargetPlatform.iOS ||
+      defaultTargetPlatform == TargetPlatform.macOS;
+  if (supportsFirebase) {
+    try {
+      await Firebase.initializeApp(
+        options: DefaultFirebaseOptions.currentPlatform,
+      );
+    } catch (_) {}
+  }
 
   // WorkManager só tem implementação em Android/iOS — em desktop/web pular
   // evita o crash de inicialização (não afeta o app publicado na Play Store).
@@ -90,9 +111,11 @@ class CopaDoMundoApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => HistoryProvider()),
         ChangeNotifierProvider(create: (_) => SimulatorProvider()),
         ChangeNotifierProvider(create: (_) => BolaoProvider()),
+        ChangeNotifierProvider(create: (_) => TodayMatchesProvider()),
+        ChangeNotifierProvider(create: (_) => RankingProvider()),
       ],
       child: MaterialApp(
-        title: 'Copa do Mundo',
+        title: 'Calm Cup',
         debugShowCheckedModeBanner: false,
         theme: _buildTheme(),
         home: const HomeScreen(),

@@ -1,0 +1,30 @@
+{
+  "project_info": {
+    "project_number": "756568610379",
+    "firebase_url": "https://calmcup-24f38-default-rtdb.firebaseio.com",
+    "project_id": "calmcup-24f38",
+    "storage_bucket": "calmcup-24f38.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:756568610379:android:0abf9e58520d5ba578dfce",
+        "android_client_info": {
+          "package_name": "com.calm.cup"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC6azdipSi3_9DujUFook-mPhkQiJmdZ5A"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

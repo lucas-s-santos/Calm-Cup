@@ -15,6 +15,13 @@ class Match {
   final List<Goal> goals1;
   final List<Goal> goals2;
 
+  /// Só definido quando a fonte de dados sabe explicitamente se é mata-mata
+  /// (ex.: liga de pontos corridos, que nunca tem prorrogação mas também não
+  /// tem `group`). Quando `null`, cai no heurístico antigo (`group == null`)
+  /// — mantém compatibilidade com Copa do Mundo/Euro, cujo mata-mata real é
+  /// justamente identificado pela ausência de grupo.
+  final bool? isKnockoutStageOverride;
+
   const Match({
     required this.round,
     required this.date,
@@ -27,6 +34,7 @@ class Match {
     this.score,
     this.goals1 = const [],
     this.goals2 = const [],
+    this.isKnockoutStageOverride,
   });
 
   factory Match.fromJson(Map<String, dynamic> json) {
@@ -42,11 +50,11 @@ class Match {
       team1: json['team1'] as String,
       team2: json['team2'] as String,
       group: json['group'] as String?,
-      ground: json['ground'] as String,
+      // Ligas domésticas (football.json) não informam estádio por jogo,
+      // ao contrário de Copa do Mundo/Euro (worldcup.json/euro.json).
+      ground: (json['ground'] as String?) ?? '',
       num: asIntOrNull(json['num']),
-      score: json['score'] != null
-          ? Score.fromJson(json['score'] as Map<String, dynamic>)
-          : null,
+      score: json['score'] != null ? Score.fromJson(json['score']) : null,
       goals1: parseGoals(json['goals1']),
       goals2: parseGoals(json['goals2']),
     );
@@ -66,9 +74,12 @@ class Match {
         score: score ?? this.score,
         goals1: goals1,
         goals2: goals2,
+        isKnockoutStageOverride: isKnockoutStageOverride,
       );
 
   bool get isGroupStage => group != null;
+
+  bool get isKnockoutStage => isKnockoutStageOverride ?? (group == null);
 
   bool get hasResult => score?.hasResult == true;
 
@@ -78,7 +89,7 @@ class Match {
   bool get isLive {
     final now = DateTime.now();
     final start = dateTime;
-    final duration = Duration(minutes: group == null ? 120 : 105);
+    final duration = Duration(minutes: isKnockoutStage ? 120 : 105);
     return !now.isBefore(start) && now.isBefore(start.add(duration));
   }
 
