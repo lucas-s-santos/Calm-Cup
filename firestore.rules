@@ -1,0 +1,70 @@
+rules_version = '2';
+
+// Regras do ranking do Bolão.
+//
+// Contexto: os palpites e a pontuação são calculados no dispositivo
+// (`BolaoProvider.computeTotal`) e só o total é enviado pra cá. Como a config
+// do Firebase viaja dentro do APK, qualquer pessoa consegue falar com este
+// banco — então tudo que dá pra validar sem servidor é validado aqui.
+//
+// O que estas regras garantem:
+//   - ninguém escreve no lugar de outra pessoa (uid do doc == uid autenticado);
+//   - pontuação é inteiro, não-negativo e coerente com o nº de palpites
+//     (máximo de 3 pontos por palpite — o placar cheio);
+//   - apelido é string curta, não um payload arbitrário;
+//   - ninguém apaga a entrada de outro nem o ranking inteiro.
+//
+// O que elas NÃO garantem: que a pontuação enviada corresponda aos palpites
+// reais contra os resultados reais. Isso só é possível movendo o cálculo pro
+// servidor (Cloud Function lendo os palpites e os placares). Enquanto isso, o
+// ranking é "na honra" — com o teto acima impedindo o valor absurdo.
+//
+// Deploy: `firebase deploy --only firestore:rules`
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isOwner(uid) {
+      return request.auth != null && request.auth.uid == uid;
+    }
+
+    function validNickname(value) {
+      return value is string
+          && value.size() >= 1
+          && value.size() <= 20;
+    }
+
+    // Perfil do participante — só o dono lê e escreve.
+    match /bolao_users/{uid} {
+      allow read: if isOwner(uid);
+      allow create, update: if isOwner(uid)
+          && validNickname(request.resource.data.nickname);
+      allow delete: if isOwner(uid);
+    }
+
+    // Ranking por competição. Leitura pública (é um placar), escrita só da
+    // própria entrada.
+    match /bolao_rankings/{competitionId}/entries/{uid} {
+      allow read: if true;
+
+      allow create, update: if isOwner(uid)
+          && request.resource.data.uid == uid
+          && validNickname(request.resource.data.nickname)
+          && request.resource.data.points is int
+          && request.resource.data.points >= 0
+          && request.resource.data.predictionsMade is int
+          && request.resource.data.predictionsMade >= 0
+          // 3 pontos é o máximo por palpite (placar exato).
+          && request.resource.data.points
+             <= request.resource.data.predictionsMade * 3
+          && request.resource.data.editionId is string
+          && request.resource.data.editionId.size() <= 40;
+
+      allow delete: if isOwner(uid);
+    }
+
+    // Nada mais é acessível.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
