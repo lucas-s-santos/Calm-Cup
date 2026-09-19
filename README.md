@@ -30,9 +30,9 @@ O Calm Cup começou como um app de acompanhamento só da Copa do Mundo 2026. Est
 - **Simulador** de torneio com auto-simulação e chaveamento interativo.
 - **Bolão** (pool de palpites) com pontuação automática.
 - **Histórico** completo de Copas (1930–2022): artilheiros, títulos por país, maiores goleadas.
-- **Notificações locais** de início/fim de jogo, agendadas mesmo com o app fechado (WorkManager).
+- **Notificações locais** de início/fim de jogo, agendadas mesmo com o app fechado (WorkManager), com fallback automático para alarme inexato no Android 14+, onde `SCHEDULE_EXACT_ALARM` deixou de ser concedida a apps fora da categoria despertador/calendário.
 - **Quiz** de conhecimentos gerais sobre Copa do Mundo.
-- Tudo funcionando **offline** com cache local (os dados baixados ficam disponíveis mesmo sem internet).
+- Tudo funcionando **offline** com cache local: *todas* as competições guardam o último dado baixado (indexado pela URL da edição), e a UI distingue "sem jogos hoje" de "sem conexão" em vez de tratar os dois como lista vazia.
 
 ### Arquitetura
 
@@ -69,6 +69,7 @@ O parser de texto (`OpenFootballTextService`) foi escrito contra dados **reais**
 - `network_security_config.xml` negando tráfego cleartext explicitamente.
 - Build de release não quebra em checkout limpo sem `key.properties` (cai pra assinatura de debug em vez de lançar exceção).
 - Sem chaves de API em lugar nenhum — todas as fontes de dados são públicas e gratuitas.
+- Regras do Firestore versionadas no repositório (`firestore.rules`, deploy com `firebase deploy --only firestore:rules`): cada participante do ranking só escreve na própria entrada, e a pontuação é validada contra o teto de 3 pontos por palpite. O cálculo em si continua no cliente — o ranking é "na honra", e as regras servem pra impedir o valor absurdo, não pra provar o placar.
 
 ### Stack técnica
 
