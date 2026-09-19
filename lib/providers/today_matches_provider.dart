@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import '../data/competitions_catalog.dart';
 import '../models/competition.dart';
 import '../models/match.dart';
+import '../services/local_storage_service.dart';
 import '../services/openfootball_json_service.dart';
 import '../services/openfootball_text_service.dart';
 
@@ -36,17 +37,34 @@ class LabeledMatch {
 class TodayMatchesProvider extends ChangeNotifier {
   final OpenFootballJsonService _jsonApi = OpenFootballJsonService();
   final OpenFootballTextService _textApi = OpenFootballTextService();
+  final LocalStorageService _local = LocalStorageService();
 
   bool _loading = false;
   bool get loading => _loading;
   bool _loaded = false;
   bool get loaded => _loaded;
 
+  bool _usedCache = false;
+  int _failedCompetitions = 0;
+
+  /// `true` quando pelo menos uma competição não pôde ser atualizada e
+  /// entrou com dados do cache offline — a home avisa que a lista pode estar
+  /// desatualizada.
+  bool get usedCache => _usedCache;
+
+  /// `true` quando *nenhuma* competição carregou (nem da rede nem do cache):
+  /// a lista vazia é falha de conexão, não "não há jogos hoje". Sem isso a
+  /// home dizia "nenhum jogo" para quem estava simplesmente offline.
+  bool get allFailed =>
+      _loaded && _failedCompetitions == competitionsCatalog.length;
+
   List<LabeledMatch> _catalogMatches = [];
 
   Future<void> load({bool force = false}) async {
     if (_loaded && !force) return;
     _loading = true;
+    _usedCache = false;
+    _failedCompetitions = 0;
     notifyListeners();
 
     final perCompetition = await Future.wait(
@@ -60,9 +78,10 @@ class TodayMatchesProvider extends ChangeNotifier {
   }
 
   Future<List<LabeledMatch>> _fetchCompetition(Competition c) async {
-    try {
-      final edition = c.editions.first;
-      final raw = await _jsonApi.fetchMatchesRawFromUrl(edition.matchesUrl);
+    final edition = c.editions.first;
+    final url = edition.matchesUrl;
+
+    List<LabeledMatch> label(String raw) {
       final matches = edition.sourceFormat == DataSourceFormat.text
           ? _textApi.parseMatches(raw, edition.textDialect!)
           : _jsonApi.parseMatchesFromRaw(raw);
@@ -74,7 +93,25 @@ class TodayMatchesProvider extends ChangeNotifier {
                 competitionId: c.id,
               ))
           .toList();
+    }
+
+    try {
+      final raw = await _jsonApi.fetchMatchesRawFromUrl(url);
+      await _local.saveRawByUrl(url, raw);
+      return label(raw);
     } catch (_) {
+      // Offline (ou competição fora do ar): usa os últimos dados baixados
+      // dessa competição em vez de sumir com ela da home. Quem falhou *e*
+      // não tem cache continua saindo em silêncio — uma competição não
+      // derruba as outras dez.
+      try {
+        final cached = await _local.loadRawByUrl(url);
+        if (cached != null) {
+          _usedCache = true;
+          return label(cached);
+        }
+      } catch (_) {}
+      _failedCompetitions++;
       return const [];
     }
   }

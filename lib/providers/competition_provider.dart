@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import '../models/match.dart';
 import '../models/competition.dart';
+import '../services/local_storage_service.dart';
 import '../services/openfootball_json_service.dart';
 import '../services/openfootball_text_service.dart';
 import '../utils/standings_calculator.dart';
@@ -14,6 +15,7 @@ import '../utils/standings_calculator.dart';
 class CompetitionProvider extends ChangeNotifier {
   final OpenFootballJsonService _jsonApi = OpenFootballJsonService();
   final OpenFootballTextService _textApi = OpenFootballTextService();
+  final LocalStorageService _local = LocalStorageService();
 
   final Competition competition;
   CompetitionEdition _edition;
@@ -34,6 +36,13 @@ class CompetitionProvider extends ChangeNotifier {
   String? _error;
   String? get error => _error;
 
+  bool _fromCache = false;
+
+  /// `true` quando as partidas exibidas vieram do cache offline porque a rede
+  /// falhou — a tela avisa que os dados podem estar desatualizados em vez de
+  /// deixar a pessoa achar que são ao vivo.
+  bool get fromCache => _fromCache;
+
   Future<void> selectEdition(CompetitionEdition newEdition) async {
     if (newEdition.id == _edition.id) return;
     _edition = newEdition;
@@ -46,18 +55,37 @@ class CompetitionProvider extends ChangeNotifier {
     _error = null;
     notifyListeners();
 
+    final url = _edition.matchesUrl;
     try {
-      final raw = await _jsonApi.fetchMatchesRawFromUrl(_edition.matchesUrl);
-      _matches = _edition.sourceFormat == DataSourceFormat.text
-          ? _textApi.parseMatches(raw, _edition.textDialect!)
-          : _jsonApi.parseMatchesFromRaw(raw);
+      final raw = await _jsonApi.fetchMatchesRawFromUrl(url);
+      await _local.saveRawByUrl(url, raw);
+      _matches = _parse(raw);
+      _fromCache = false;
     } catch (e) {
-      _error = e.toString();
+      // Mesma estratégia rede → cache offline que a Copa 2026 já usava: sem
+      // internet a competição continua abrindo com os últimos dados vistos,
+      // sinalizados como desatualizados em vez de virarem tela de erro.
+      final cached = await _local.loadRawByUrl(url);
+      if (cached != null) {
+        try {
+          _matches = _parse(cached);
+          _fromCache = true;
+        } catch (_) {
+          _error = e.toString();
+        }
+      } else {
+        _error = e.toString();
+      }
     }
 
     _loading = false;
     notifyListeners();
   }
+
+  List<Match> _parse(String raw) =>
+      _edition.sourceFormat == DataSourceFormat.text
+          ? _textApi.parseMatches(raw, _edition.textDialect!)
+          : _jsonApi.parseMatchesFromRaw(raw);
 
   /// Partidas agrupadas por rodada e ordenadas cronologicamente (pela data
   /// do primeiro jogo de cada rodada) — mesma ideia do

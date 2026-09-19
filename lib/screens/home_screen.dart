@@ -9,6 +9,7 @@ import '../utils/constants.dart';
 import '../utils/team_names_pt.dart';
 import '../widgets/match_card.dart';
 import '../widgets/notification_toggle.dart';
+import '../widgets/offline_banner.dart';
 import 'history_screen.dart';
 import 'match_detail_screen.dart';
 import 'stats_screen.dart';
@@ -219,6 +220,16 @@ class _DashboardTabState extends State<_DashboardTab>
               ),
             ),
           ),
+          // Alguma competição entrou com dados do cache — a lista abaixo pode
+          // estar desatualizada, e é melhor dizer isso do que exibir jogos
+          // velhos como se fossem os de agora.
+          if (!loadingToday && todayProvider.usedCache && !todayProvider.allFailed)
+            const SliverToBoxAdapter(
+              child: OfflineBanner(
+                message:
+                    'Sem conexão — alguns campeonatos podem estar desatualizados.',
+              ),
+            ),
           if (liveNow.isNotEmpty)
             SliverToBoxAdapter(child: _LiveNowBanner(liveMatches: liveNow)),
           SliverToBoxAdapter(
@@ -243,9 +254,15 @@ class _DashboardTabState extends State<_DashboardTab>
             ),
           if (loadingToday)
             const SliverToBoxAdapter(child: _SkeletonMatchList(count: 3))
-          else if (provider.error != null)
-            SliverToBoxAdapter(
-                child: _ErrorCard(message: provider.error!))
+          // O cartão de erro só aparece quando não sobrou nada pra mostrar.
+          // Antes, uma falha só da Copa escondia os jogos das outras onze
+          // competições que tinham carregado sem problema; e a falha de
+          // conexão de *todas* elas caía no mesmo "nenhum jogo hoje" de um
+          // dia realmente vazio.
+          else if (labeledToday.isEmpty &&
+              labeledNextDays.isEmpty &&
+              (provider.error != null || todayProvider.allFailed))
+            const SliverToBoxAdapter(child: _ErrorCard())
           else if (labeledToday.isEmpty)
             SliverToBoxAdapter(
               child: _EmptyMatchesCard(upcomingMatches: labeledNextDays),
@@ -915,8 +932,7 @@ class _EmptyMatchesCard extends StatelessWidget {
 }
 
 class _ErrorCard extends StatelessWidget {
-  final String message;
-  const _ErrorCard({required this.message});
+  const _ErrorCard();
 
   @override
   Widget build(BuildContext context) {

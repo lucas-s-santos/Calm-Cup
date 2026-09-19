@@ -6,6 +6,25 @@ class LocalStorageService {
   static const _matchesCacheKey = 'matches_2026_json';
   static const _teamsCacheKey = 'teams_2026_json';
   static const _stadiumsCacheKey = 'stadiums_2026_json';
+  static const _rawPrefix = 'raw_';
+
+  /// Cache bruto por URL de origem — o equivalente genérico dos caches
+  /// dedicados da Copa 2026 acima, para as competições do catálogo
+  /// (Brasileirão, Champions, ligas...). A URL da edição já é um
+  /// identificador estável e único, então serve de chave sem inventar outra.
+  ///
+  /// Guarda o texto exato recebido da rede (JSON ou o formato de texto do
+  /// openfootball, tanto faz) — quem parseia é o serviço, do mesmo jeito que
+  /// faria com a resposta ao vivo.
+  Future<void> saveRawByUrl(String url, String raw) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_rawPrefix + url, raw);
+  }
+
+  Future<String?> loadRawByUrl(String url) async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(_rawPrefix + url);
+  }
 
   Future<void> saveMatchesCache(String rawJson) async {
     final prefs = await SharedPreferences.getInstance();

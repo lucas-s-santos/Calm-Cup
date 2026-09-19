@@ -6,6 +6,7 @@ import '../providers/competition_provider.dart';
 import '../theme/app_colors.dart';
 import '../utils/team_names_pt.dart';
 import '../widgets/match_card.dart';
+import '../widgets/offline_banner.dart';
 import '../widgets/standings_table.dart';
 import 'match_detail_screen.dart';
 
@@ -124,14 +125,21 @@ class _CompetitionViewState extends State<_CompetitionView>
       body: provider.loading
           ? const Center(child: CircularProgressIndicator(color: AppColors.gold))
           : provider.error != null
-              ? _ErrorState(message: provider.error!, onRetry: provider.load)
-              : TabBarView(
-                  controller: _tabController,
+              ? _ErrorState(onRetry: provider.load)
+              : Column(
                   children: [
-                    _FixturesTab(provider: provider),
-                    isLeague
-                        ? _LeagueTableTab(provider: provider)
-                        : _GroupsTab(provider: provider),
+                    if (provider.fromCache) const OfflineBanner(),
+                    Expanded(
+                      child: TabBarView(
+                        controller: _tabController,
+                        children: [
+                          _FixturesTab(provider: provider),
+                          isLeague
+                              ? _LeagueTableTab(provider: provider)
+                              : _GroupsTab(provider: provider),
+                        ],
+                      ),
+                    ),
                   ],
                 ),
     );
@@ -346,9 +354,8 @@ class _GroupsTab extends StatelessWidget {
 // ── Erro ──────────────────────────────────────────────────────────────────────
 
 class _ErrorState extends StatelessWidget {
-  final String message;
   final VoidCallback onRetry;
-  const _ErrorState({required this.message, required this.onRetry});
+  const _ErrorState({required this.onRetry});
 
   @override
   Widget build(BuildContext context) {
