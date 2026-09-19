@@ -43,13 +43,21 @@ class _NotificationToggleState extends State<NotificationToggle> {
     }
 
     await ns.setEnabled(true);
-    await ns.scheduleMatchNotifications(widget.matches);
+    // Conta o que o sistema aceitou de verdade, não o que a gente pediu —
+    // no Android 14+ sem permissão de alarme exato o agendamento cai pra
+    // inexato, e se nem isso passar o número precisa refletir a realidade.
+    final scheduled = await ns.scheduleMatchNotifications(widget.matches);
     if (mounted) setState(() => _enabled = true);
 
-    final count = widget.matches
+    if (scheduled == 0) {
+      _showSnack('Nenhum jogo futuro para notificar');
+      return;
+    }
+
+    final games = widget.matches
         .where((m) => m.dateTime.isAfter(DateTime.now()))
         .length;
-    _showSnack('🔔 Notificações ativadas para $count jogos');
+    _showSnack('🔔 Notificações ativadas para $games jogos');
   }
 
   void _showSnack(String msg) {

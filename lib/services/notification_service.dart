@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart' show Color;
+import 'package:flutter/services.dart' show PlatformException;
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:timezone/timezone.dart' as tz;
@@ -20,6 +21,13 @@ class NotificationService {
 
   // IDs reservados por partida: base*10+0 (15min antes), +1 (início), +2 (fim), +3 (ao vivo)
   static const _liveIdOffset = 3;
+
+  // Resultado do último `canScheduleExactNotifications()`. Consultado uma vez
+  // por rodada de agendamento (e não por alarme) pra não pagar 300 chamadas
+  // de canal; zerado no início de cada `scheduleMatchNotifications` porque a
+  // pessoa pode ter concedido a permissão nas configurações do sistema entre
+  // uma rodada e outra.
+  bool? _exactAlarmsAllowed;
 
   Future<void> initialize() async {
     // flutter_local_notifications e Platform.isX (dart:io) não existem na
@@ -87,10 +95,41 @@ class NotificationService {
     return true;
   }
 
-  Future<void> scheduleMatchNotifications(List<Match> matches) async {
-    if (kIsWeb) return;
+  /// `true` quando o sistema permite alarmes exatos.
+  ///
+  /// A partir do Android 14 a permissão `SCHEDULE_EXACT_ALARM` deixou de ser
+  /// concedida automaticamente na instalação: só apps de alarme/calendário
+  /// qualificam pra `USE_EXACT_ALARM` (e a política do Play barra um app de
+  /// futebol nessa categoria). Sem a permissão, `zonedSchedule` com
+  /// `exactAllowWhileIdle` lança `exact_alarms_not_permitted` no lado nativo
+  /// — por isso todo agendamento passa por aqui antes.
+  ///
+  /// iOS não tem esse conceito (as notificações locais são sempre exatas).
+  Future<bool> canScheduleExactAlarms() async {
+    if (kIsWeb || !Platform.isAndroid) return true;
+    try {
+      final impl = _plugin.resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin>();
+      return await impl?.canScheduleExactNotifications() ?? false;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Agenda as notificações das partidas e devolve quantas foram realmente
+  /// agendadas — o chamador usa esse número pra não prometer à pessoa um
+  /// alerta que o sistema recusou.
+  ///
+  /// Quando alarmes exatos não estão disponíveis, cai para
+  /// `inexactAllowWhileIdle` em vez de falhar: para um aviso de "15 minutos
+  /// antes" a folga que o Android se dá é irrelevante, e é infinitamente
+  /// melhor que nenhuma notificação.
+  Future<int> scheduleMatchNotifications(List<Match> matches) async {
+    if (kIsWeb) return 0;
     await _plugin.cancelAll();
+    _exactAlarmsAllowed = await canScheduleExactAlarms();
     final now = DateTime.now();
+    var scheduled = 0;
 
     for (int i = 0; i < matches.length; i++) {
       final match = matches[i];
@@ -118,30 +157,38 @@ class NotificationService {
         );
       }
 
-      await _schedule(
+      if (await _schedule(
         id: i * 10,
         title: '⚽ Jogo em 15 minutos!',
         body: '$teams | $phase',
         when: kickoff.subtract(const Duration(minutes: 15)),
         now: now,
-      );
+      )) {
+        scheduled++;
+      }
 
-      await _schedule(
+      if (await _schedule(
         id: i * 10 + 1,
         title: '🟢 Bola rolando!',
         body: '$teams — $phase',
         when: kickoff,
         now: now,
-      );
+      )) {
+        scheduled++;
+      }
 
-      await _schedule(
+      if (await _schedule(
         id: i * 10 + 2,
         title: '🏁 Fim de jogo!',
         body: teams,
         when: kickoff.add(matchDuration),
         now: now,
-      );
+      )) {
+        scheduled++;
+      }
     }
+
+    return scheduled;
   }
 
   Future<void> _show({
@@ -149,11 +196,69 @@ class NotificationService {
     required String title,
     required String body,
   }) async {
-    await _plugin.show(
-      id,
-      title,
-      body,
-      NotificationDetails(
+    try {
+      await _plugin.show(id, title, body, _detailsFor(body));
+    } catch (_) {
+      // Mesma regra do agendamento: uma notificação recusada não derruba o resto.
+    }
+  }
+
+  /// Agenda um alarme e devolve se ele foi de fato aceito pelo sistema.
+  ///
+  /// Nunca lança: uma partida cujo alarme o Android recusar não pode
+  /// interromper o agendamento das outras ~300 (era exatamente esse o efeito
+  /// de deixar a exceção subir daqui).
+  Future<bool> _schedule({
+    required int id,
+    required String title,
+    required String body,
+    required DateTime when,
+    required DateTime now,
+  }) async {
+    if (when.isBefore(now)) return false;
+
+    final tzWhen = tz.TZDateTime.fromMillisecondsSinceEpoch(
+      tz.UTC,
+      when.millisecondsSinceEpoch,
+    );
+
+    Future<void> send(AndroidScheduleMode mode) => _plugin.zonedSchedule(
+          id,
+          title,
+          body,
+          tzWhen,
+          _detailsFor(body),
+          androidScheduleMode: mode,
+          uiLocalNotificationDateInterpretation:
+              UILocalNotificationDateInterpretation.absoluteTime,
+        );
+
+    final exact = _exactAlarmsAllowed ?? false;
+    try {
+      await send(exact
+          ? AndroidScheduleMode.exactAllowWhileIdle
+          : AndroidScheduleMode.inexactAllowWhileIdle);
+      return true;
+    } on PlatformException catch (e) {
+      // A permissão pode ter sido revogada entre a checagem e este alarme.
+      // Marca pro resto da rodada e repete este mesmo alarme como inexato.
+      if (e.code == 'exact_alarms_not_permitted' && exact) {
+        _exactAlarmsAllowed = false;
+        try {
+          await send(AndroidScheduleMode.inexactAllowWhileIdle);
+          return true;
+        } catch (_) {
+          return false;
+        }
+      }
+      return false;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  // Mesmo visual para notificação imediata e agendada.
+  NotificationDetails _detailsFor(String body) => NotificationDetails(
         android: AndroidNotificationDetails(
           _channelId,
           _channelName,
@@ -165,47 +270,7 @@ class NotificationService {
           color: const Color(0xFF1E1E1E),
           autoCancel: true,
         ),
-      ),
-    );
-  }
-
-  Future<void> _schedule({
-    required int id,
-    required String title,
-    required String body,
-    required DateTime when,
-    required DateTime now,
-  }) async {
-    if (when.isBefore(now)) return;
-
-    final tzWhen = tz.TZDateTime.fromMillisecondsSinceEpoch(
-      tz.UTC,
-      when.millisecondsSinceEpoch,
-    );
-
-    await _plugin.zonedSchedule(
-      id,
-      title,
-      body,
-      tzWhen,
-      NotificationDetails(
-        android: AndroidNotificationDetails(
-          _channelId,
-          _channelName,
-          importance: Importance.high,
-          priority: Priority.high,
-          icon: '@mipmap/ic_launcher',
-          largeIcon:
-              const DrawableResourceAndroidBitmap('@mipmap/ic_launcher'),
-          styleInformation: BigTextStyleInformation(body),
-          color: const Color(0xFF1E1E1E),
-        ),
-      ),
-      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-      uiLocalNotificationDateInterpretation:
-          UILocalNotificationDateInterpretation.absoluteTime,
-    );
-  }
+      );
 
   Future<void> cancelAllNotifications() async {
     if (kIsWeb) return;
