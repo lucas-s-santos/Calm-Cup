@@ -71,6 +71,32 @@ O parser de texto (`OpenFootballTextService`) foi escrito contra dados **reais**
 - Sem chaves de API em lugar nenhum — todas as fontes de dados são públicas e gratuitas.
 - Regras do Firestore versionadas no repositório (`firestore.rules`, deploy com `firebase deploy --only firestore:rules`): cada participante do ranking só escreve na própria entrada, e a pontuação é validada contra o teto de 3 pontos por palpite. O cálculo em si continua no cliente — o ranking é "na honra", e as regras servem pra impedir o valor absurdo, não pra provar o placar.
 
+### Gerando um release
+
+```
+VER-APP.bat     roda o app em debug (funciona de qualquer pasta)
+GERAR-AAB.bat   gera o AAB assinado para a Play Store
+```
+
+**O AAB precisa ser gerado de um caminho sem acento.** O compilador AOT do
+Android (`gen_snapshot`) não consegue abrir arquivos cujo caminho tenha
+caractere não-ASCII: o `Á` de "Área de Trabalho" chega corrompido e o build
+morre com `Unable to read file: ...app.dill` / `exited with code 255`. O
+sintoma engana porque `flutter test`, `analyze`, `build web` e o modo debug
+funcionam normalmente — só o AOT quebra. `GERAR-AAB.bat` detecta isso e para
+antes de tentar, em vez de deixar o erro confuso aparecer.
+
+Para criar (ou recriar) o clone de release:
+
+```bash
+git clone -b <branch> "<caminho do repo>" C:/projetos/calmcup-release
+cp <repo>/android/key.properties      C:/projetos/calmcup-release/android/
+cp <repo>/android/calmcup-release.jks C:/projetos/calmcup-release/android/
+```
+
+Os dois arquivos de assinatura são copiados à mão porque estão no
+`.gitignore` — e é assim que deve ser.
+
 ### Stack técnica
 
 Flutter · Dart · Provider (state management) · `fl_chart` · `flutter_local_notifications` · `workmanager` · `shared_preferences` · testes com `flutter_test`.
